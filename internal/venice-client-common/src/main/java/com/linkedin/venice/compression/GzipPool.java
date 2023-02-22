@@ -22,12 +22,11 @@ class GzipPool implements AutoCloseable {
     }
   }
 
-  private static final CloseableThreadLocal<ReusableObjects> reusableObjectsThreadLocal =
+  private final CloseableThreadLocal<ReusableObjects> reusableObjectsThreadLocal =
       new CloseableThreadLocal(ReusableObjects::new);
 
   /**
    * Retrieves an {@link ReusableGzipOutputStream} for the given {@link OutputStream}. Instances are pooled per thread.
-   *
    */
   public ReusableGzipOutputStream getReusableGzipOutputStream() {
     ReusableObjects reusableObjects = reusableObjectsThreadLocal.get();
