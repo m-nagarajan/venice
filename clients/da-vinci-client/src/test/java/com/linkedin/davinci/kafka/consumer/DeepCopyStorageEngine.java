@@ -94,6 +94,14 @@ public class DeepCopyStorageEngine extends AbstractStorageEngine<AbstractStorage
   }
 
   @Override
+  public boolean checkDatabaseIntegrity(
+      int partitionId,
+      Map<String, String> checkpointedInfo,
+      StoragePartitionConfig storagePartitionConfig) {
+    return this.delegate.checkDatabaseIntegrity(partitionId, checkpointedInfo, storagePartitionConfig);
+  }
+
+  @Override
   public void beginBatchWrite(
       StoragePartitionConfig storagePartitionConfig,
       Map<String, String> checkpointedInfo,
