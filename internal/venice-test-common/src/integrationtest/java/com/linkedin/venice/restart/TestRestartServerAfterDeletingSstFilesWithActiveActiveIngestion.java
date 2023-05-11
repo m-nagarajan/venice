@@ -21,6 +21,7 @@ import com.linkedin.davinci.storage.StorageService;
 import com.linkedin.davinci.store.rocksdb.ReplicationMetadataRocksDBStoragePartition;
 import com.linkedin.davinci.store.rocksdb.RocksDBStorageEngine;
 import com.linkedin.venice.ConfigKeys;
+import com.linkedin.venice.D2.D2ClientUtils;
 import com.linkedin.venice.client.store.AvroGenericStoreClient;
 import com.linkedin.venice.client.store.ClientConfig;
 import com.linkedin.venice.client.store.ClientFactory;
@@ -83,6 +84,9 @@ public class TestRestartServerAfterDeletingSstFilesWithActiveActiveIngestion {
       LogManager.getLogger(TestRestartServerAfterDeletingSstFilesWithActiveActiveIngestion.class);
   private static final int TEST_TIMEOUT = 120 * Time.MS_PER_SECOND;
   private VeniceTwoLayerMultiRegionMultiClusterWrapper multiRegionMultiClusterWrapper;
+  /*protected List<VeniceMultiClusterWrapper> childDatacenters;
+  protected List<VeniceControllerWrapper> parentControllers;
+  private D2Client d2ClientForDC0Region;*/
   private VeniceClusterWrapper clusterWrapper;
   private VeniceServerWrapper serverWrapper;
   private ControllerClient parentControllerClient;
@@ -120,6 +124,16 @@ public class TestRestartServerAfterDeletingSstFilesWithActiveActiveIngestion {
         Optional.empty(),
         Optional.of(new VeniceProperties(serverProperties)),
         false);
+
+    /*childDatacenters = multiRegionMultiClusterWrapper.getChildRegions();
+    parentControllers = multiRegionMultiClusterWrapper.getParentControllers();
+    
+    // Set up a d2 client for DC0 region
+    d2ClientForDC0Region = new D2ClientBuilder().setZkHosts(childDatacenters.get(0).getZkServerWrapper().getAddress())
+        .setZkSessionTimeout(3, TimeUnit.SECONDS)
+        .setZkStartupTimeout(3, TimeUnit.SECONDS)
+        .build();
+    D2ClientUtils.startClient(d2ClientForDC0Region);*/
 
     List<VeniceMultiClusterWrapper> childDatacenters = multiRegionMultiClusterWrapper.getChildRegions();
     List<VeniceControllerWrapper> parentControllers = multiRegionMultiClusterWrapper.getParentControllers();
@@ -223,7 +237,7 @@ public class TestRestartServerAfterDeletingSstFilesWithActiveActiveIngestion {
         .add((ReplicationMetadataRocksDBStoragePartition) rocksDBStorageEngine.getPartitionOrThrow(0));
   }
 
-  @Test(timeOut = TEST_TIMEOUT, dataProvider = "Two-True-and-False", dataProviderClass = DataProviderUtils.class, invocationCount = 2)
+  @Test(timeOut = TEST_TIMEOUT, dataProvider = "Two-True-and-False", dataProviderClass = DataProviderUtils.class)
   public void testActiveActiveStoreWithRMDAndRestartServer(boolean deleteSSTFiles, boolean deleteRMDSSTFiles)
       throws Exception {
     // Create a new version
@@ -335,8 +349,8 @@ public class TestRestartServerAfterDeletingSstFilesWithActiveActiveIngestion {
     // validate the ingested data
     AvroGenericStoreClient<String, Object> storeClient = null;
     try {
-      D2Client d2Client =
-          D2TestUtils.getD2Client(multiRegionMultiClusterWrapper.getZkServerWrapper().getAddress(), false);
+      D2Client d2Client = D2TestUtils.getD2Client(clusterWrapper.getZk().getAddress(), false);
+      D2ClientUtils.startClient(d2Client);
       storeClient = ClientFactory.getAndStartGenericAvroClient(
           ClientConfig.defaultGenericClientConfig(storeName)
               .setForceClusterDiscoveryAtStartTime(true)
