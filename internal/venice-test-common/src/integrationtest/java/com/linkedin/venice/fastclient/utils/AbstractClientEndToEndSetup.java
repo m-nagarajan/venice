@@ -432,11 +432,12 @@ public abstract class AbstractClientEndToEndSetup {
     }
   }
 
-  protected AvroGenericStoreClient<String, GenericRecord> getGenericThinClient() {
+  protected AvroGenericStoreClient<String, GenericRecord> getGenericThinClient(MetricsRepository metricsRepository) {
     return com.linkedin.venice.client.store.ClientFactory.getAndStartGenericAvroClient(
         com.linkedin.venice.client.store.ClientConfig.defaultGenericClientConfig(storeName)
             .setVeniceURL(veniceCluster.getRandomRouterSslURL())
-            .setSslFactory(SslUtils.getVeniceLocalSslFactory()));
+            .setSslFactory(SslUtils.getVeniceLocalSslFactory())
+            .setMetricsRepository(metricsRepository));
   }
 
   protected AvroGenericStoreClient<String, Object> getGenericVsonThinClient() {

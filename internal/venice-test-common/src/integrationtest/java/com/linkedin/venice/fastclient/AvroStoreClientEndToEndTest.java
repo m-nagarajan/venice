@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import org.apache.avro.generic.GenericRecord;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
@@ -40,13 +41,16 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
       ClientConfig.ClientConfigBuilder clientConfigBuilder,
       boolean batchGet,
       int batchGetKeySize,
+      Optional<AvroGenericStoreClient> vsonThinClient,
       StoreMetadataFetchMode storeMetadataFetchMode) throws Exception {
     runTest(
         clientConfigBuilder,
         batchGet,
         batchGetKeySize,
         (metricsRepository) -> {},
-        Optional.empty(),
+        (metricsRepository) -> {},
+        null,
+        vsonThinClient,
         storeMetadataFetchMode);
   }
 
@@ -62,7 +66,9 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
       ClientConfig.ClientConfigBuilder clientConfigBuilder,
       boolean batchGet,
       int batchGetKeySize,
-      Consumer<MetricsRepository> statsValidation,
+      Consumer<MetricsRepository> fastClientStatsValidation,
+      Consumer<MetricsRepository> thinClientStatsValidation,
+      MetricsRepository thinClientMetricsRepository,
       Optional<AvroGenericStoreClient> vsonThinClient,
       StoreMetadataFetchMode storeMetadataFetchMode) throws Exception {
     MetricsRepository metricsRepositoryForGenericClient = new MetricsRepository();
@@ -155,7 +161,8 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
           assertEquals((int) vsonValue.get(VALUE_FIELD_NAME), i);
         }
       }
-      statsValidation.accept(metricsRepositoryForGenericClient);
+      fastClientStatsValidation.accept(metricsRepositoryForGenericClient);
+      thinClientStatsValidation.accept(thinClientMetricsRepository);
     } finally {
       if (genericFastClient != null) {
         genericFastClient.close();
@@ -212,7 +219,7 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
           assertEquals(value.int_field, i);
         }
       }
-      statsValidation.accept(metricsRepositoryForSpecificClient);
+      fastClientStatsValidation.accept(metricsRepositoryForSpecificClient);
     } finally {
       if (specificFastClient != null) {
         specificFastClient.close();
@@ -243,33 +250,66 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
           .setBatchGetDefaultsToStreamingBatchGet(batchGetDefaultsToStreamingBatchGet);
     }
 
-    // no retry should happen
-    Consumer<MetricsRepository> statsValidation = metricsRepository -> {
-      metricsRepository.metrics().forEach((mName, metric) -> {
-        if (mName.contains("long_tail_retry_request")) {
-          assertTrue(metric.value() == 0, "Long tail retry should not be triggered");
-        }
-      });
-    };
-
     // dualRead needs thinClient
     AvroGenericStoreClient<String, GenericRecord> genericThinClient = null;
     AvroSpecificStoreClient<String, TestValueSchema> specificThinClient = null;
     AvroGenericStoreClient<String, Object> genericVsonThinClient = null;
+    MetricsRepository thinClientMetricsRepository = new MetricsRepository();
+    Consumer<MetricsRepository> thinClientStatsValidation;
 
     try {
       if (dualRead) {
-        genericThinClient = getGenericThinClient();
+        genericThinClient = getGenericThinClient(thinClientMetricsRepository);
         clientConfigBuilder.setGenericThinClient(genericThinClient);
         specificThinClient = getSpecificThinClient();
         clientConfigBuilder.setSpecificThinClient(specificThinClient);
         genericVsonThinClient = getGenericVsonThinClient();
+        thinClientStatsValidation = metricsRepository -> {
+          Assert.assertTrue(
+              metricsRepository.metrics()
+                  .get("." + storeName + (batchGet ? "--multiget_streaming_" : "--") + "request_key_count.Rate")
+                  .value() > 0,
+              "Dual read metrics should be incremented when dual read is enabled");
+        };
+      } else {
+        thinClientStatsValidation = metricsRepository -> {
+          metricsRepository.metrics()
+              .forEach(
+                  (mName, metric) -> assertTrue(
+                      metric.value() == 0,
+                      "Dual read metrics should not be incremented when dual read is enabled"));
+        };
       }
+
+      Consumer<MetricsRepository> fastClientStatsValidation = metricsRepository -> {
+        assertTrue(
+            metricsRepository.metrics()
+                .get(
+                    "." + storeName + (batchGetDefaultsToStreamingBatchGet ? "--multiget_" : "--")
+                        + "request_key_count.Rate")
+                .value() > 0,
+            "Respective request_key_count should have been incremented");
+        Assert.assertFalse(
+            metricsRepository.metrics()
+                .get(
+                    "." + storeName + (batchGetDefaultsToStreamingBatchGet ? "--" : "--multiget_")
+                        + "request_key_count.Rate")
+                .value() > 0,
+            "Incorrect request_key_count should not be incremented");
+        metricsRepository.metrics().forEach((mName, metric) -> {
+          if (mName.contains("long_tail_retry_request")) {
+            assertTrue(metric.value() == 0, "Long tail retry should not be triggered");
+          }
+        });
+      };
+
       runTest(
           clientConfigBuilder,
           batchGet,
           batchGetKeySize,
-          statsValidation,
+          fastClientStatsValidation,
+          thinClientStatsValidation,
+          thinClientMetricsRepository,
           dualRead ? Optional.of(genericVsonThinClient) : Optional.empty(),
           storeMetadataFetchMode);
 
@@ -310,10 +350,11 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
     AvroGenericStoreClient<String, GenericRecord> genericThinClient = null;
     AvroSpecificStoreClient<String, TestValueSchema> specificThinClient = null;
     AvroGenericStoreClient<String, Object> genericVsonThinClient = null;
+    MetricsRepository thinClientMetricsRepository = new MetricsRepository();
 
     try {
       if (dualRead) {
-        genericThinClient = getGenericThinClient();
+        genericThinClient = getGenericThinClient(thinClientMetricsRepository);
         clientConfigBuilder.setGenericThinClient(genericThinClient);
         specificThinClient = getSpecificThinClient();
         clientConfigBuilder.setSpecificThinClient(specificThinClient);
@@ -323,7 +364,6 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
           clientConfigBuilder,
           multiGet,
           batchGetKeySize,
-          m -> {},
           dualRead ? Optional.of(genericVsonThinClient) : Optional.empty(),
           StoreMetadataFetchMode.SERVER_BASED_METADATA);
     } finally {
@@ -349,8 +389,7 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
             .setR2Client(r2Client)
             .setDualReadEnabled(false);
 
-    // no retry should happen
-    Consumer<MetricsRepository> statsValidation = metricsRepository -> {
+    Consumer<MetricsRepository> fastClientStatsValidation = metricsRepository -> {
       metricsRepository.metrics().forEach((mName, metric) -> {
         if (mName.contains("long_tail_retry_request")) {
           assertTrue(metric.value() == 0, "Long tail retry should not be triggered");
@@ -359,8 +398,24 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
     };
 
     // test both single and multiGet
-    runTest(clientConfigBuilder, false, 2, statsValidation, Optional.empty(), storeMetadataFetchMode);
-    runTest(clientConfigBuilder, true, 2, statsValidation, Optional.empty(), storeMetadataFetchMode);
+    runTest(
+        clientConfigBuilder,
+        false,
+        2,
+        fastClientStatsValidation,
+        m -> {},
+        null,
+        Optional.empty(),
+        storeMetadataFetchMode);
+    runTest(
+        clientConfigBuilder,
+        true,
+        2,
+        fastClientStatsValidation,
+        m -> {},
+        null,
+        Optional.empty(),
+        storeMetadataFetchMode);
   }
 
   @Test(dataProvider = "FastClient-Two-Boolean-Store-Metadata-Fetch-Mode", timeOut = TIME_OUT)
@@ -378,7 +433,7 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
           .setBatchGetDefaultsToStreamingBatchGet(batchGetDefaultsToStreamingBatchGet);
     }
 
-    Consumer<MetricsRepository> statsValidation;
+    Consumer<MetricsRepository> fastClientStatsValidation;
     // If batch get via looping single get, retry is not supported
     if (!batchGet || batchGetDefaultsToStreamingBatchGet) {
       String metricPrefix;
@@ -394,16 +449,16 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
         clientConfigBuilder.setLongTailRetryEnabledForSingleGet(true)
             .setLongTailRetryThresholdForSingleGetInMicroSeconds(1);
       }
-      statsValidation = metricsRepository -> {
-        metricsRepository.metrics().forEach((mName, metric) -> {
-          if (mName.contains(metricPrefix + "long_tail_retry_request")) {
-            assertTrue(metric.value() > 0, "Long tail retry for " + log + " should be triggered");
-          }
-        });
+      fastClientStatsValidation = metricsRepository -> {
+        Assert.assertTrue(
+            metricsRepository.metrics()
+                .get("." + storeName + metricPrefix + "long_tail_retry_request.OccurrenceRate")
+                .value() > 0,
+            "Long tail retry for " + log + " should be triggered");
       };
     } else {
       // If single get or batchGet get via looping single get: retry is not supported
-      statsValidation = metricsRepository -> {
+      fastClientStatsValidation = metricsRepository -> {
         metricsRepository.metrics().forEach((mName, metric) -> {
           if (mName.contains("long_tail_retry_request")) {
             assertTrue(metric.value() == 0, "Long tail retry should not be triggered");
@@ -411,6 +466,14 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
         });
       };
     }
-    runTest(clientConfigBuilder, batchGet, recordCnt, statsValidation, Optional.empty(), storeMetadataFetchMode);
+    runTest(
+        clientConfigBuilder,
+        batchGet,
+        recordCnt,
+        fastClientStatsValidation,
+        m -> {},
+        null,
+        Optional.empty(),
+        storeMetadataFetchMode);
   }
 }

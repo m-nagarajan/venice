@@ -126,8 +126,9 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
             .setRoutingPendingRequestCounterInstanceBlockThreshold(recordCnt + 1)
             .setBatchGetDefaultsToStreamingBatchGet(batchGetDefaultsToStreamingBatchGet);
 
+    MetricsRepository metricsRepository = new MetricsRepository();
     AvroGenericStoreClient<String, GenericRecord> genericFastClient =
-        getGenericFastClient(clientConfigBuilder, new MetricsRepository(), storeMetadataFetchMode);
+        getGenericFastClient(clientConfigBuilder, metricsRepository, storeMetadataFetchMode);
 
     Set<String> keys = new HashSet<>();
     for (int i = 0; i < recordCnt; ++i) {
@@ -141,6 +142,22 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
       GenericRecord value = results.get(key);
       Assert.assertEquals(value.get(VALUE_FIELD_NAME), i);
     }
+
+    Assert.assertTrue(
+        metricsRepository.metrics()
+            .get(
+                "." + storeName + (batchGetDefaultsToStreamingBatchGet ? "--multiget_" : "--")
+                    + "request_key_count.Rate")
+            .value() > 0,
+        "Respective request_key_count should have been incremented");
+    Assert.assertFalse(
+        metricsRepository.metrics()
+            .get(
+                "." + storeName + (batchGetDefaultsToStreamingBatchGet ? "--" : "--multiget_")
+                    + "request_key_count.Rate")
+            .value() > 0,
+        "Incorrect request_key_count should not be incremented");
+
     FastClientStats stats = clientConfig.getStats(RequestType.MULTI_GET);
     LOGGER.info("STATS: {}", stats.buildSensorStatSummary("multiget_healthy_request_latency"));
     printAllStats();
@@ -160,11 +177,9 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
             .setRoutingPendingRequestCounterInstanceBlockThreshold(recordCnt)
             .setBatchGetDefaultsToStreamingBatchGet(batchGetDefaultsToStreamingBatchGet);
 
-    AvroSpecificStoreClient<String, TestValueSchema> specificFastClient = getSpecificFastClient(
-        clientConfigBuilder,
-        new MetricsRepository(),
-        TestValueSchema.class,
-        storeMetadataFetchMode);
+    MetricsRepository metricsRepository = new MetricsRepository();
+    AvroSpecificStoreClient<String, TestValueSchema> specificFastClient =
+        getSpecificFastClient(clientConfigBuilder, metricsRepository, TestValueSchema.class, storeMetadataFetchMode);
 
     Set<String> keys = new HashSet<>();
     for (int i = 0; i < recordCnt; ++i) {
@@ -177,6 +192,22 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
       GenericRecord value = results.get(key);
       Assert.assertEquals(value.get(VALUE_FIELD_NAME), i);
     }
+
+    Assert.assertTrue(
+        metricsRepository.metrics()
+            .get(
+                "." + storeName + (batchGetDefaultsToStreamingBatchGet ? "--multiget_" : "--")
+                    + "request_key_count.Rate")
+            .value() > 0,
+        "Respective request_key_count should have been incremented");
+    Assert.assertFalse(
+        metricsRepository.metrics()
+            .get(
+                "." + storeName + (batchGetDefaultsToStreamingBatchGet ? "--" : "--multiget_")
+                    + "request_key_count.Rate")
+            .value() > 0,
+        "Incorrect request_key_count should not be incremented");
+
     specificFastClient.close();
     printAllStats();
   }
@@ -189,8 +220,9 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
             .setSpeculativeQueryEnabled(true)
             .setDualReadEnabled(false);
 
+    MetricsRepository metricsRepository = new MetricsRepository();
     AvroGenericStoreClient<String, GenericRecord> genericFastClient =
-        getGenericFastClient(clientConfigBuilder, new MetricsRepository(), storeMetadataFetchMode);
+        getGenericFastClient(clientConfigBuilder, metricsRepository, storeMetadataFetchMode);
 
     Set<String> keys = new HashSet<>();
     for (int i = 0; i < recordCnt; ++i) {
@@ -225,6 +257,13 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
         veniceResponseMap.getNonExistingKeys().size(),
         1,
         "Incorrect non existing key size . Expected  1 got " + veniceResponseMap.getNonExistingKeys().size());
+
+    Assert.assertTrue(
+        metricsRepository.metrics().get("." + storeName + "--multiget_request_key_count.Rate").value() > 0,
+        "Respective request_key_count should have been incremented");
+    Assert.assertFalse(
+        metricsRepository.metrics().get("." + storeName + "--request_key_count.Rate").value() > 0,
+        "Incorrect request_key_count should not be incremented");
   }
 
   @Test(dataProvider = "StoreMetadataFetchModes")
@@ -236,8 +275,9 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
             .setSpeculativeQueryEnabled(true)
             .setDualReadEnabled(false);
 
+    MetricsRepository metricsRepository = new MetricsRepository();
     AvroGenericStoreClient<String, GenericRecord> genericFastClient =
-        getGenericFastClient(clientConfigBuilder, new MetricsRepository(), storeMetadataFetchMode);
+        getGenericFastClient(clientConfigBuilder, metricsRepository, storeMetadataFetchMode);
     Set<String> keys = new HashSet<>();
     for (int i = 0; i < recordCnt; ++i) {
       keys.add(keyPrefix + i);
@@ -302,6 +342,13 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
     LOGGER.info(
         "STATS: latency -> {}",
         stats.buildSensorStatSummary("multiget_healthy_request_latency", "99thPercentile"));
+
+    Assert.assertTrue(
+        metricsRepository.metrics().get("." + storeName + "--multiget_request_key_count.Rate").value() > 0,
+        "Respective request_key_count should have been incremented");
+    Assert.assertFalse(
+        metricsRepository.metrics().get("." + storeName + "--request_key_count.Rate").value() > 0,
+        "Incorrect request_key_count should not be incremented");
     printAllStats();
   }
 }
