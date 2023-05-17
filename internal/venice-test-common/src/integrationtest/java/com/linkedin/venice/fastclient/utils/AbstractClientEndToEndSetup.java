@@ -160,6 +160,11 @@ public abstract class AbstractClientEndToEndSetup {
         STORE_METADATA_FETCH_MODES); // storeMetadataFetchMode
   }
 
+  @DataProvider(name = "FastClient-One-Boolean-Store-Metadata-Fetch-Mode")
+  public Object[][] oneBooleanStoreMetadataFetchMode() {
+    return DataProviderUtils.allPermutationGenerator(DataProviderUtils.BOOLEAN, STORE_METADATA_FETCH_MODES);
+  }
+
   @DataProvider(name = "FastClient-Three-Boolean-And-A-Number")
   public Object[][] threeBooleanAndANumber() {
     return DataProviderUtils.allPermutationGenerator(

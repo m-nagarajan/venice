@@ -61,8 +61,6 @@ public class StatsAvroGenericStoreClient<K, V> extends DelegatingAvroStoreClient
   protected CompletableFuture<Map<K, V>> batchGetUsingStreamingBatchGet(
       BatchGetRequestContext<K, V> requestContext,
       Set<K> keys) throws VeniceClientException {
-    /*LOGGER.info("BBBBBBBB stream 3");
-    throw new VeniceClientException("BBBBBBBB stream 3");*/
     long startTimeInNS = System.nanoTime();
 
     CompletableFuture<Map<K, V>> innerFuture = super.batchGet(requestContext, keys);
@@ -119,26 +117,22 @@ public class StatsAvroGenericStoreClient<K, V> extends DelegatingAvroStoreClient
       BatchGetRequestContext<K, V> requestContext,
       Set<K> keys,
       StreamingCallback<K, V> callback) {
-    LOGGER.info("BBBBBBBB stream 2");
-    throw new VeniceClientException("BBBBBBBB stream 2");
-    /*long startTimeInNS = System.nanoTime();
+    long startTimeInNS = System.nanoTime();
     CompletableFuture<Void> statFuture = new CompletableFuture<>();
     super.streamingBatchGet(
         requestContext,
         keys,
         new StatTrackingStreamingCallBack<>(callback, statFuture, requestContext));
-    recordMetrics(requestContext, keys.size(), statFuture, startTimeInNS, clientStatsForBatchGet);*/
+    recordMetrics(requestContext, keys.size(), statFuture, startTimeInNS, clientStatsForBatchGet);
   }
 
   @Override
   protected CompletableFuture<VeniceResponseMap<K, V>> streamingBatchGet(
       BatchGetRequestContext<K, V> requestContext,
       Set<K> keys) {
-    LOGGER.info("BBBBBBBB stream 1");
-    throw new VeniceClientException("BBBBBBBB stream 1");
-    /*long startTimeInNS = System.nanoTime();
+    long startTimeInNS = System.nanoTime();
     CompletableFuture<VeniceResponseMap<K, V>> innerFuture = super.streamingBatchGet(requestContext, keys);
-    return recordMetrics(requestContext, keys.size(), innerFuture, startTimeInNS, clientStatsForBatchGet);*/
+    return recordMetrics(requestContext, keys.size(), innerFuture, startTimeInNS, clientStatsForBatchGet);
   }
 
   private <R> CompletableFuture<R> recordMetrics(

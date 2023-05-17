@@ -112,8 +112,10 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
   /**
    * Creates a batchget request which uses scatter gather to fetch all keys from different replicas.
    */
-  @Test(dataProvider = "StoreMetadataFetchModes")
-  public void testBatchGetGenericClient(StoreMetadataFetchMode storeMetadataFetchMode) throws Exception {
+  @Test(dataProvider = "FastClient-One-Boolean-Store-Metadata-Fetch-Mode")
+  public void testBatchGetGenericClient(
+      boolean batchGetDefaultsToStreamingBatchGet,
+      StoreMetadataFetchMode storeMetadataFetchMode) throws Exception {
     ClientConfig.ClientConfigBuilder clientConfigBuilder =
         new ClientConfig.ClientConfigBuilder<>().setStoreName(storeName)
             .setR2Client(r2Client)
@@ -121,7 +123,8 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
             .setDualReadEnabled(false)
             .setMaxAllowedKeyCntInBatchGetReq(recordCnt + 1) // +1 for nonExistingKey
             // TODO: this needs to be revisited to see how much this should be set. Current default is 50.
-            .setRoutingPendingRequestCounterInstanceBlockThreshold(recordCnt + 1);
+            .setRoutingPendingRequestCounterInstanceBlockThreshold(recordCnt + 1)
+            .setBatchGetDefaultsToStreamingBatchGet(batchGetDefaultsToStreamingBatchGet);
 
     AvroGenericStoreClient<String, GenericRecord> genericFastClient =
         getGenericFastClient(clientConfigBuilder, new MetricsRepository(), storeMetadataFetchMode);
@@ -143,8 +146,10 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
     printAllStats();
   }
 
-  @Test(dataProvider = "StoreMetadataFetchModes")
-  public void testBatchGetSpecificClient(StoreMetadataFetchMode storeMetadataFetchMode) throws Exception {
+  @Test(dataProvider = "FastClient-One-Boolean-Store-Metadata-Fetch-Mode")
+  public void testBatchGetSpecificClient(
+      boolean batchGetDefaultsToStreamingBatchGet,
+      StoreMetadataFetchMode storeMetadataFetchMode) throws Exception {
     ClientConfig.ClientConfigBuilder clientConfigBuilder =
         new ClientConfig.ClientConfigBuilder<>().setStoreName(storeName)
             .setR2Client(r2Client)
@@ -152,7 +157,8 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
             .setDualReadEnabled(false)
             .setMaxAllowedKeyCntInBatchGetReq(recordCnt)
             // TODO: this needs to be revisited to see how much this should be set. Current default is 50.
-            .setRoutingPendingRequestCounterInstanceBlockThreshold(recordCnt);
+            .setRoutingPendingRequestCounterInstanceBlockThreshold(recordCnt)
+            .setBatchGetDefaultsToStreamingBatchGet(batchGetDefaultsToStreamingBatchGet);
 
     AvroSpecificStoreClient<String, TestValueSchema> specificFastClient = getSpecificFastClient(
         clientConfigBuilder,
@@ -181,8 +187,7 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
         new ClientConfig.ClientConfigBuilder<>().setStoreName(storeName)
             .setR2Client(r2Client)
             .setSpeculativeQueryEnabled(true)
-            .setDualReadEnabled(false)
-            .setMaxAllowedKeyCntInBatchGetReq(2);
+            .setDualReadEnabled(false);
 
     AvroGenericStoreClient<String, GenericRecord> genericFastClient =
         getGenericFastClient(clientConfigBuilder, new MetricsRepository(), storeMetadataFetchMode);
@@ -229,8 +234,7 @@ public class BatchGetAvroStoreClientTest extends AbstractClientEndToEndSetup {
         new ClientConfig.ClientConfigBuilder<>().setStoreName(storeName)
             .setR2Client(r2Client)
             .setSpeculativeQueryEnabled(true)
-            .setDualReadEnabled(false)
-            .setMaxAllowedKeyCntInBatchGetReq(2);
+            .setDualReadEnabled(false);
 
     AvroGenericStoreClient<String, GenericRecord> genericFastClient =
         getGenericFastClient(clientConfigBuilder, new MetricsRepository(), storeMetadataFetchMode);

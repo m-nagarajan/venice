@@ -73,7 +73,6 @@ public class DelegatingAvroStoreClient<K, V> extends InternalAvroStoreClient<K, 
 
   protected CompletableFuture<Map<K, V>> batchGetUsingSingleGet(Set<K> keys) throws VeniceClientException {
     return delegate.batchGet(keys);
-    // throw new VeniceClientException("BBBBBBBBB final");
   }
 
   @Override

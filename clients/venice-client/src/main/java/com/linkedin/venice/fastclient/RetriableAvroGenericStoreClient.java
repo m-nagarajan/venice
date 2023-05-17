@@ -135,12 +135,6 @@ public class RetriableAvroGenericStoreClient<K, V> extends DelegatingAvroStoreCl
 
     originalRequestFuture.whenComplete((value, throwable) -> {
       if (throwable == null) {
-        LOGGER.info("AAAAAAAA : singleGet retry cancelled");
-        /*try {
-          Thread.sleep(5000);
-        } catch (InterruptedException e) {
-          throw new RuntimeException(e);
-        }*/
         if (!timeoutFuture.isDone()) {
           timeoutFuture.cancel();
         }
@@ -176,8 +170,6 @@ public class RetriableAvroGenericStoreClient<K, V> extends DelegatingAvroStoreCl
 
   protected CompletableFuture<Map<K, V>> batchGet(BatchGetRequestContext<K, V> requestContext, Set<K> keys)
       throws VeniceClientException {
-    /*LOGGER.info("BBBBBBBB stream 7");
-    throw new VeniceClientException("BBBBBBBB stream 7");*/
     // keys that do not exist in the storage nodes
     Queue<K> nonExistingKeys = new ConcurrentLinkedQueue<>();
     VeniceConcurrentHashMap<K, V> valueMap = new VeniceConcurrentHashMap<>();
@@ -230,8 +222,6 @@ public class RetriableAvroGenericStoreClient<K, V> extends DelegatingAvroStoreCl
       BatchGetRequestContext<K, V> requestContext,
       Set<K> keys,
       StreamingCallback<K, V> callback) throws VeniceClientException {
-    /*    LOGGER.info("BBBBBBBB stream 8");
-    throw new VeniceClientException("BBBBBBBB stream 8");*/
     if (!longTailRetryEnabledForBatchGet) {
       // if longTailRetry is not enabled for batch get, simply return
       super.streamingBatchGet(requestContext, keys, callback);
@@ -299,12 +289,6 @@ public class RetriableAvroGenericStoreClient<K, V> extends DelegatingAvroStoreCl
 
     finalRequestCompletionFuture.whenComplete((ignore, finalException) -> {
       if (!scheduledRetryTask.isDone()) {
-        LOGGER.info("AAAAAAAA : batchGet retry cancelled");
-        /*try {
-          Thread.sleep(5000);
-        } catch (InterruptedException e) {
-          throw new RuntimeException(e);
-        }*/
         scheduledRetryTask.cancel();
       }
       if (finalException == null) {
