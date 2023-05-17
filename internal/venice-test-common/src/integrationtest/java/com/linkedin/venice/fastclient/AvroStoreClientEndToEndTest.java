@@ -96,7 +96,6 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
             assertEquals(resultMap.size(), 2);
             assertEquals((int) resultMap.get(key1).get(VALUE_FIELD_NAME), i);
             assertEquals((int) resultMap.get(key2).get(VALUE_FIELD_NAME), i + 1);
-            LOGGER.info("Result: key: {}, value {}", key1, (int) resultMap.get(key1).get(VALUE_FIELD_NAME));
 
             // Test Vson client
             Map<String, Object> vsonResultMapofObj = genericFastVsonClient.batchGet(keys).get();
@@ -129,7 +128,6 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
           for (int i = 0; i < recordCnt; ++i) {
             String key = keyPrefix + i;
             assertEquals((int) resultMap.get(key).get(VALUE_FIELD_NAME), i);
-            LOGGER.info("Result: key: {}, value {}", key, (int) resultMap.get(key).get(VALUE_FIELD_NAME));
           }
 
           // vson
@@ -153,7 +151,6 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
           String key = keyPrefix + i;
           GenericRecord value = genericFastClient.get(key).get();
           assertEquals((int) value.get(VALUE_FIELD_NAME), i);
-          LOGGER.info("Result: key: {}, value {}", key, (int) value.get(VALUE_FIELD_NAME));
 
           // Test Vson client
           Object vsonResult = genericFastVsonClient.get(key).get();
@@ -371,7 +368,7 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
     runTest(clientConfigBuilder, true, 2, storeMetadataFetchMode);
   }
 
-  @Test(dataProvider = "FastClient-Two-Boolean-Store-Metadata-Fetch-Mode")
+  @Test(dataProvider = "FastClient-Two-Boolean-Store-Metadata-Fetch-Mode", timeOut = TIME_OUT)
   public void testFastClientWithLongTailRetry(
       boolean batchGet,
       boolean batchGetDefaultsToStreamingBatchGet,
@@ -388,7 +385,7 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
 
     Consumer<MetricsRepository> statsValidation;
     // If batch get via looping single get, retry is not supported
-    if (!batchGet || (batchGet && batchGetDefaultsToStreamingBatchGet)) {
+    if (!batchGet || batchGetDefaultsToStreamingBatchGet) {
       String metricPrefix;
       String log;
       if (batchGet) {

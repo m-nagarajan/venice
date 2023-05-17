@@ -116,7 +116,7 @@ public abstract class AbstractClientEndToEndSetup {
    * not be sent due to blocked instances. Setting this variable to be 100 from the tests for now.
    * This needs to be discussed further.
    */
-  public static final Object[] BATCH_GET_KEY_SIZE = { 2, recordCnt };
+  static final Object[] BATCH_GET_KEY_SIZE = { 2, recordCnt };
 
   @DataProvider(name = "FastClient-Four-Boolean-A-Number-Store-Metadata-Fetch-Mode")
   public Object[][] fourBooleanANumberStoreMetadataFetchMode() {
