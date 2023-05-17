@@ -432,18 +432,6 @@ public abstract class AbstractClientEndToEndSetup {
     }
   }
 
-  protected void cleanupThinClientForMetaStore() {
-    if (thinClientForMetaStore != null) {
-      thinClientForMetaStore.close();
-      thinClientForMetaStore = null;
-    }
-  }
-
-  /*protected void cleanupMetaStore() {
-    cleanupThinClientForMetaStore();
-    cleanupDaVinciClientForMetaStore();
-  }*/
-
   protected AvroGenericStoreClient<String, GenericRecord> getGenericThinClient() {
     return com.linkedin.venice.client.store.ClientFactory.getAndStartGenericAvroClient(
         com.linkedin.venice.client.store.ClientConfig.defaultGenericClientConfig(storeName)

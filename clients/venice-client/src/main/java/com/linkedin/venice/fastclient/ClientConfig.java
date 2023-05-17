@@ -70,6 +70,7 @@ public class ClientConfig<K, V, T extends SpecificRecord> {
   private final StoreMetadataFetchMode storeMetadataFetchMode;
   private final D2Client d2Client;
   private final String clusterDiscoveryD2Service;
+  /** whether batch get reuses single get or streamingBatchget **/
   private final boolean batchGetDefaultsToStreamingBatchGet;
 
   private ClientConfig(
@@ -208,7 +209,9 @@ public class ClientConfig<K, V, T extends SpecificRecord> {
     }
     this.batchGetDefaultsToStreamingBatchGet = batchGetDefaultsToStreamingBatchGet;
     if (this.batchGetDefaultsToStreamingBatchGet) {
-      LOGGER.info("BatchGet will default to streamingBatchGet");
+      LOGGER.info("BatchGet will use streamingBatchGet");
+    } else {
+      LOGGER.warn("BatchGet will reuse single get");
     }
   }
 

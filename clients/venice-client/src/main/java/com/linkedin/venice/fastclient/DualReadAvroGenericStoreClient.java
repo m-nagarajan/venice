@@ -138,11 +138,6 @@ public class DualReadAvroGenericStoreClient<K, V> extends DelegatingAvroStoreCli
     return dualExecute(() -> super.get(requestContext, key), () -> thinClient.get(key), clientStatsForSingleGet);
   }
 
-  /*  @Override
-  public CompletableFuture<Map<K, V>> batchGet(Set<K> keys) throws VeniceClientException {
-    return dualExecute(() -> super.batchGet(keys), () -> thinClient.batchGet(keys), clientStatsForMultiGet);
-  }*/
-
   @Override
   public CompletableFuture<Map<K, V>> batchGet(BatchGetRequestContext<K, V> requestContext, Set<K> keys)
       throws VeniceClientException {

@@ -21,8 +21,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.testng.annotations.Test;
 
 
@@ -38,8 +36,6 @@ import org.testng.annotations.Test;
  */
 
 public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
-  private static final Logger LOGGER = LogManager.getLogger(AvroStoreClientEndToEndTest.class);
-
   protected void runTest(
       ClientConfig.ClientConfigBuilder clientConfigBuilder,
       boolean batchGet,
@@ -161,7 +157,6 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
       }
       statsValidation.accept(metricsRepositoryForGenericClient);
     } finally {
-      // cleanupMetaStore();
       if (genericFastClient != null) {
         genericFastClient.close();
       }
@@ -323,23 +318,14 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
         specificThinClient = getSpecificThinClient();
         clientConfigBuilder.setSpecificThinClient(specificThinClient);
         genericVsonThinClient = getGenericVsonThinClient();
-
-        runTest(
-            clientConfigBuilder,
-            multiGet,
-            batchGetKeySize,
-            m -> {},
-            Optional.of(genericVsonThinClient),
-            StoreMetadataFetchMode.SERVER_BASED_METADATA);
-      } else {
-        runTest(
-            clientConfigBuilder,
-            multiGet,
-            batchGetKeySize,
-            m -> {},
-            Optional.empty(),
-            StoreMetadataFetchMode.SERVER_BASED_METADATA);
       }
+      runTest(
+          clientConfigBuilder,
+          multiGet,
+          batchGetKeySize,
+          m -> {},
+          dualRead ? Optional.of(genericVsonThinClient) : Optional.empty(),
+          StoreMetadataFetchMode.SERVER_BASED_METADATA);
     } finally {
       if (genericThinClient != null) {
         genericThinClient.close();
@@ -363,9 +349,18 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
             .setR2Client(r2Client)
             .setDualReadEnabled(false);
 
+    // no retry should happen
+    Consumer<MetricsRepository> statsValidation = metricsRepository -> {
+      metricsRepository.metrics().forEach((mName, metric) -> {
+        if (mName.contains("long_tail_retry_request")) {
+          assertTrue(metric.value() == 0, "Long tail retry should not be triggered");
+        }
+      });
+    };
+
     // test both single and multiGet
-    runTest(clientConfigBuilder, false, 2, storeMetadataFetchMode);
-    runTest(clientConfigBuilder, true, 2, storeMetadataFetchMode);
+    runTest(clientConfigBuilder, false, 2, statsValidation, Optional.empty(), storeMetadataFetchMode);
+    runTest(clientConfigBuilder, true, 2, statsValidation, Optional.empty(), storeMetadataFetchMode);
   }
 
   @Test(dataProvider = "FastClient-Two-Boolean-Store-Metadata-Fetch-Mode", timeOut = TIME_OUT)
@@ -407,6 +402,7 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
         });
       };
     } else {
+      // If single get or batchGet get via looping single get: retry is not supported
       statsValidation = metricsRepository -> {
         metricsRepository.metrics().forEach((mName, metric) -> {
           if (mName.contains("long_tail_retry_request")) {

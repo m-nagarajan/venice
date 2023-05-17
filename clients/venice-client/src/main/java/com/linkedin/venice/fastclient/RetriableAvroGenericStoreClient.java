@@ -168,6 +168,11 @@ public class RetriableAvroGenericStoreClient<K, V> extends DelegatingAvroStoreCl
     return finalFuture;
   }
 
+  /**
+   * The logic is copied from {@link DispatchingAvroGenericStoreClient#streamingBatchGet(BatchGetRequestContext, Set)}
+   * to reuse {@link RetriableAvroGenericStoreClient#streamingBatchGet(BatchGetRequestContext, Set, StreamingCallback)}
+   * to add the retry functionality to batchGet API.
+   */
   protected CompletableFuture<Map<K, V>> batchGet(BatchGetRequestContext<K, V> requestContext, Set<K> keys)
       throws VeniceClientException {
     // keys that do not exist in the storage nodes
