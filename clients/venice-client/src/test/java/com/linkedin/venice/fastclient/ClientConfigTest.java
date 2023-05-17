@@ -88,4 +88,12 @@ public class ClientConfigTest {
         .setLongTailRetryThresholdForSingleGetInMicroSeconds(1000)
         .build();
   }
+
+  /*  @Test
+  public void testBatchGetWithLoopingSingleGet() {
+    ClientConfig.ClientConfigBuilder clientConfigBuilder = getClientConfigWithMinimumRequiredInputs();
+    clientConfigBuilder.setThinClientForMetaStore()
+    clientConfigBuilder.setMetadataRefreshIntervalInSeconds(1)
+  
+  }*/
 }

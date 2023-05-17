@@ -274,16 +274,14 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
   }
 
   /**
-   * This implementation is for future use. It will get wired in via
-   * InternalAvroStoreClient.batchGet(Set<K> keys)
-   * @param requestContext
-   * @param keys
-   * @return
-   * @throws VeniceClientException
+   * batchGet defaults to streamingBatchGet
    */
   @Override
   protected CompletableFuture<Map<K, V>> batchGet(BatchGetRequestContext<K, V> requestContext, Set<K> keys)
       throws VeniceClientException {
+    /*LOGGER.info("BBBBBBBB stream 4");
+    throw new VeniceClientException("BBBBBBBB stream 4");
+    */
     verifyMetadataInitialized();
     CompletableFuture<Map<K, V>> responseFuture = new CompletableFuture<>();
     CompletableFuture<VeniceResponseMap<K, V>> streamingResponseFuture = streamingBatchGet(requestContext, keys);
@@ -310,6 +308,8 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
   protected CompletableFuture<VeniceResponseMap<K, V>> streamingBatchGet(
       BatchGetRequestContext<K, V> requestContext,
       Set<K> keys) throws VeniceClientException {
+    /*LOGGER.info("BBBBBBBB stream 5");
+    throw new VeniceClientException("BBBBBBBB stream 5");*/
     verifyMetadataInitialized();
     // keys that do not exist in the storage nodes
     Queue<K> nonExistingKeys = new ConcurrentLinkedQueue<>();
@@ -356,6 +356,8 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
       BatchGetRequestContext<K, V> requestContext,
       Set<K> keys,
       StreamingCallback<K, V> callback) {
+    /*LOGGER.info("BBBBBBBB stream 6");
+    throw new VeniceClientException("BBBBBBBB stream 6");*/
     verifyMetadataInitialized();
     /* This implementation is intentionally designed to separate the request phase (scatter) and the response handling
      * phase (gather). These internal methods help to keep this separation and leaves room for future fine-grained control. */
