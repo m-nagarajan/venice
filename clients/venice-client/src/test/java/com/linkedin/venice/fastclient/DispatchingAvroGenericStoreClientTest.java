@@ -7,7 +7,6 @@ import com.linkedin.r2.transport.common.Client;
 import com.linkedin.venice.client.store.transport.TransportClient;
 import com.linkedin.venice.client.store.transport.TransportClientResponse;
 import com.linkedin.venice.compression.CompressionStrategy;
-import com.linkedin.venice.exceptions.VeniceException;
 import com.linkedin.venice.fastclient.meta.StoreMetadata;
 import com.linkedin.venice.fastclient.meta.utils.RequestBasedMetadataTestUtils;
 import com.linkedin.venice.fastclient.stats.FastClientStats;
@@ -16,6 +15,7 @@ import com.linkedin.venice.read.RequestType;
 import com.linkedin.venice.read.protocol.response.MultiGetResponseRecordV1;
 import com.linkedin.venice.serializer.SerializerDeserializerFactory;
 import com.linkedin.venice.utils.DataProviderUtils;
+import com.linkedin.venice.utils.TestUtils;
 import io.tehuti.Metric;
 import io.tehuti.metrics.MetricsRepository;
 import java.io.IOException;
@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.avro.Schema;
 import org.apache.logging.log4j.LogManager;
@@ -61,7 +62,7 @@ public class DispatchingAvroGenericStoreClientTest {
     BATCH_GET_VALUE_RESPONSE.put("test_key_2", "test_value_2");
   }
 
-  private void setUpClient(boolean useStreamingBatchGetAsDefault, boolean transportClientThrowsException) {
+  private void setUpClient(boolean useStreamingBatchGetAsDefault) {
     clientConfigBuilder = new ClientConfig.ClientConfigBuilder<>().setStoreName(STORE_NAME)
         .setR2Client(mock(Client.class))
         .setUseStreamingBatchGetAsDefault(useStreamingBatchGetAsDefault)
@@ -79,20 +80,23 @@ public class DispatchingAvroGenericStoreClientTest {
     statsAvroGenericStoreClient = new StatsAvroGenericStoreClient(dispatchingAvroGenericStoreClient, clientConfig);
     statsAvroGenericStoreClient.start();
 
+    TestUtils.waitForNonDeterministicCompletion(5, TimeUnit.SECONDS, () -> {
+      try {
+        dispatchingAvroGenericStoreClient.verifyMetadataInitialized();
+        return true;
+      } catch (Exception e) {
+        return false;
+      }
+    });
+
     // mock get()
     doReturn(valueFuture).when(mockTransportClient).get(any());
-    if (!transportClientThrowsException) {
-      TransportClientResponse singleGetResponse = new TransportClientResponse(
-          1,
-          CompressionStrategy.NO_OP,
-          SerializerDeserializerFactory
-              .getAvroGenericSerializer(Schema.parse(RequestBasedMetadataTestUtils.VALUE_SCHEMA))
-              .serialize(SINGLE_GET_VALUE_RESPONSE));
-      valueFuture.complete(singleGetResponse);
-    } else {
-      valueFuture.completeExceptionally(new VeniceException("Exception for client to return 503"));
-      // doThrow(new VeniceException("Exception for client to return 503")).when(mockTransportClient).get(any());
-    }
+    TransportClientResponse singleGetResponse = new TransportClientResponse(
+        1,
+        CompressionStrategy.NO_OP,
+        SerializerDeserializerFactory.getAvroGenericSerializer(Schema.parse(RequestBasedMetadataTestUtils.VALUE_SCHEMA))
+            .serialize(SINGLE_GET_VALUE_RESPONSE));
+    valueFuture.complete(singleGetResponse);
 
     // mock post()
     CompletableFuture<TransportClientResponseForRoute> batchGetValueFuture = new CompletableFuture<>();
@@ -145,7 +149,7 @@ public class DispatchingAvroGenericStoreClientTest {
   @Test
   public void testGet() throws ExecutionException, InterruptedException, IOException {
     try {
-      setUpClient(false, false);
+      setUpClient(false);
       getRequestContext = new GetRequestContext();
       String value = statsAvroGenericStoreClient.get(getRequestContext, "test_key").get().toString();
       Assert.assertEquals(value, SINGLE_GET_VALUE_RESPONSE);
@@ -173,46 +177,12 @@ public class DispatchingAvroGenericStoreClientTest {
     }
   }
 
-  /*@Test
-  public void testGetWith503() throws ExecutionException, InterruptedException, IOException {
-    try {
-      setUpClient(false, true);
-      getRequestContext = new GetRequestContext();
-      String value = statsAvroGenericStoreClient.get(getRequestContext, "test_key").get().toString();
-      Assert.assertEquals(value, SINGLE_GET_VALUE_RESPONSE);
-      metrics = getStats(clientConfig);
-      Assert.assertTrue(metrics.get("." + STORE_NAME + "--healthy_request.OccurrenceRate").value() > 0);
-      Assert.assertTrue(metrics.get("." + STORE_NAME + "--healthy_request_latency.Avg").value() > 0);
-      Assert.assertFalse(metrics.get("." + STORE_NAME + "--unhealthy_request.OccurrenceRate").value() > 0);
-      Assert.assertFalse(metrics.get("." + STORE_NAME + "--unhealthy_request_latency.Avg").value() > 0);
-      Assert.assertFalse(
-          metrics.get("." + STORE_NAME + "--no_available_replica_request_count.OccurrenceRate").value() > 0);
-      Assert.assertFalse(getRequestContext.noAvailableReplica);
-      Assert.assertEquals(metrics.get("." + STORE_NAME + "--request_key_count.Max").value(), 1.0);
-      Assert.assertEquals(metrics.get("." + STORE_NAME + "--success_request_key_count.Max").value(), 1.0);
-      Assert.assertEquals(getRequestContext.successRequestKeyCount.get(), 1);
-  
-      // not supporting retry here: so all retry related metrics should not increment
-      Assert.assertFalse(metrics.get("." + STORE_NAME + "--error_retry_request.OccurrenceRate").value() > 0);
-      Assert.assertFalse(getRequestContext.errorRetryRequestTriggered);
-      Assert.assertFalse(metrics.get("." + STORE_NAME + "--long_tail_retry_request.OccurrenceRate").value() > 0);
-      Assert.assertFalse(getRequestContext.longTailRetryRequestTriggered);
-      Assert.assertFalse(metrics.get("." + STORE_NAME + "--retry_request_win.OccurrenceRate").value() > 0);
-      Assert.assertFalse(getRequestContext.retryWin);
-    } catch (Exception e) {
-      LOGGER.error(e);
-      throw e;
-    } finally {
-      tearDown();
-    }
-  }*/
-
   @Test(dataProvider = "True-and-False", dataProviderClass = DataProviderUtils.class)
   public void testBatchGet(boolean useStreamingBatchGetAsDefault)
       throws ExecutionException, InterruptedException, IOException {
 
     try {
-      setUpClient(useStreamingBatchGetAsDefault, false);
+      setUpClient(useStreamingBatchGetAsDefault);
       batchGetRequestContext = new BatchGetRequestContext<>();
       Map<String, String> value =
           (Map<String, String>) statsAvroGenericStoreClient.batchGet(batchGetRequestContext, BATCH_GET_KEYS).get();
