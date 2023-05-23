@@ -67,9 +67,17 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
   private RecordSerializer<MultiGetRouterRequestKeyV1> multiGetSerializer;
 
   public DispatchingAvroGenericStoreClient(StoreMetadata metadata, ClientConfig config) {
+    this(metadata, config, new R2TransportClient(config.getR2Client()));
+  }
+
+  // Visible for testing
+  public DispatchingAvroGenericStoreClient(
+      StoreMetadata metadata,
+      ClientConfig config,
+      TransportClient transportClient) {
     this.metadata = metadata;
     this.config = config;
-    this.transportClient = new R2TransportClient(config.getR2Client());
+    this.transportClient = transportClient;
 
     if (config.isSpeculativeQueryEnabled()) {
       this.requiredReplicaCount = 2;
@@ -318,6 +326,7 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
         if (value == null) {
           nonExistingKeys.add(key);
         } else {
+          requestContext.successRequestKeyCount.incrementAndGet();
           valueMap.put(key, value);
         }
       }
@@ -590,7 +599,7 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
     return System.nanoTime() - startTimeStamp;
   }
 
-  private void verifyMetadataInitialized() throws VeniceClientException {
+  public void verifyMetadataInitialized() throws VeniceClientException {
     if (!metadata.isReady()) {
       throw new VeniceClientException(metadata.getStoreName() + " metadata is not ready, attempting to re-initialize");
     }
@@ -635,4 +644,11 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
     return metadata.getLatestValueSchema();
   }
 
+  public RecordSerializer<K> getKeySerializer() {
+    return keySerializer;
+  }
+
+  public RecordSerializer<MultiGetRouterRequestKeyV1> getMultiGetSerializer() {
+    return multiGetSerializer;
+  }
 }
