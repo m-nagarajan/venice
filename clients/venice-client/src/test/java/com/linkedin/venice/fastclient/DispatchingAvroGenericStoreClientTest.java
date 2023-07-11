@@ -273,7 +273,7 @@ public class DispatchingAvroGenericStoreClientTest {
       statsAvroGenericStoreClient.get(getRequestContext, "test_key").get();
       fail();
     } catch (Exception e) {
-      assertTrue(e.getMessage().endsWith("http status: 503, Request timed out"));
+      assertTrue(e.getMessage().endsWith("http status: 410, Request timed out"));
       metrics = getStats(clientConfig);
       assertFalse(metrics.get("." + STORE_NAME + "--healthy_request.OccurrenceRate").value() > 0);
       assertFalse(metrics.get("." + STORE_NAME + "--healthy_request_latency.Avg").value() > 0);
@@ -385,7 +385,7 @@ public class DispatchingAvroGenericStoreClientTest {
       if (useStreamingBatchGetAsDefault) {
         assertTrue(e.getMessage().endsWith("At least one route did not complete"));
       } else {
-        assertTrue(e.getMessage().endsWith("http status: 503, Request timed out"));
+        assertTrue(e.getMessage().endsWith("http status: 410, Request timed out"));
       }
       metrics = getStats(clientConfig, RequestType.MULTI_GET);
       String metricPrefix = useStreamingBatchGetAsDefault ? "--multiget_" : "--";

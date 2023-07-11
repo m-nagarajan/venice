@@ -522,7 +522,6 @@ public abstract class AbstractClientEndToEndSetup {
           metrics.get("." + storeName + metricPrefix + "long_tail_retry_request.OccurrenceRate").value() > 0,
           "Long tail retry for " + log + " should be triggered");
     } else {
-      // no retry should be triggered as it's not expected to be configured when calling this function
       metrics.forEach((mName, metric) -> {
         if (mName.contains("long_tail_retry_request")) {
           assertTrue(metric.value() == 0, "Long tail retry should not be triggered");

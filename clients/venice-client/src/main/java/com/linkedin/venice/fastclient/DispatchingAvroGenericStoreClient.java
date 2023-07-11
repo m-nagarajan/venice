@@ -211,7 +211,7 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
             .schedule(
                 /** Using a special http status to indicate the leaked request */
                 () -> transportFuture.completeExceptionally(
-                    new VeniceClientHttpException("Request timed out", HttpStatus.S_503_SERVICE_UNAVAILABLE.getCode())),
+                    new VeniceClientHttpException("Request timed out", HttpStatus.S_410_GONE.getCode())),
                 config.getRoutingLeakedRequestCleanupThresholdMS(),
                 TimeUnit.MILLISECONDS);
 
@@ -472,7 +472,7 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
           .schedule(
               /** Using a special http status to indicate the leaked request */
               () -> routeFuture.completeExceptionally(
-                  new VeniceClientHttpException("Request timed out", HttpStatus.S_503_SERVICE_UNAVAILABLE.getCode())),
+                  new VeniceClientHttpException("Request timed out", HttpStatus.S_410_GONE.getCode())),
               config.getRoutingLeakedRequestCleanupThresholdMS(),
               TimeUnit.MILLISECONDS);
 
