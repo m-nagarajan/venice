@@ -199,6 +199,8 @@ public class StatsAvroGenericStoreClient<K, V> extends DelegatingAvroStoreClient
         clientStats.recordResponseDeserializationTime(requestContext.responseDeserializationTime);
       }
 
+      clientStats.recordSuccessRequestKeyCount(requestContext.successRequestKeyCount.get());
+
       /**
        * Record some single-get specific metrics, and these metrics should be applied to other types of requests once
        * the corresponding features are ready.
@@ -206,7 +208,6 @@ public class StatsAvroGenericStoreClient<K, V> extends DelegatingAvroStoreClient
       if (requestContext instanceof GetRequestContext) {
         GetRequestContext getRequestContext = (GetRequestContext) requestContext;
 
-        clientStats.recordSuccessRequestKeyCount(getRequestContext.successRequestKeyCount.get());
         if (getRequestContext.longTailRetryRequestTriggered) {
           clientStats.recordLongTailRetryRequest();
         }
@@ -223,12 +224,6 @@ public class StatsAvroGenericStoreClient<K, V> extends DelegatingAvroStoreClient
           clientStats.recordRetryRequestKeyCount(batchGetRequestContext.numberOfKeysSentInRetryRequest);
           clientStats
               .recordRetryRequestSuccessKeyCount(batchGetRequestContext.numberOfKeysCompletedInRetryRequest.get());
-          // recordSuccessRequestKeyCount is total of original and retry success
-          clientStats.recordSuccessRequestKeyCount(
-              batchGetRequestContext.numberOfKeysCompletedInOriginalRequest.get()
-                  + batchGetRequestContext.numberOfKeysCompletedInRetryRequest.get());
-        } else {
-          clientStats.recordSuccessRequestKeyCount(batchGetRequestContext.numberOfKeysCompletedInOriginalRequest.get());
         }
       }
 

@@ -502,20 +502,6 @@ public abstract class AbstractClientEndToEndSetup {
           metrics.get("." + storeName + metricPrefix + "request_key_count.Max").value(),
           keyCount,
           "Respective request_key_count should have been incremented");
-      LOGGER.info(
-          "METRICSSSS1 rate:{}, Avg: {}, Max: {}",
-          metrics.get("." + storeName + metricPrefix + "success_request_key_count.Rate").value(),
-          metrics.get("." + storeName + metricPrefix + "success_request_key_count.Avg").value(),
-          metrics.get("." + storeName + metricPrefix + "success_request_key_count.Max").value());
-      String metricPrefix1 = useStreamingBatchGetAsDefault ? "--" : "--multiget_";
-      LOGGER.info(
-          "METRICSSSS2 rate:{}, Avg: {}, Max: {}",
-          metrics.get("." + storeName + metricPrefix1 + "success_request_key_count.Rate").value(),
-          metrics.get("." + storeName + metricPrefix1 + "success_request_key_count.Avg").value(),
-          metrics.get("." + storeName + metricPrefix1 + "success_request_key_count.Max").value());
-      LOGGER.info(
-          "METRICSSS3 retry: {}",
-          metrics.get("." + storeName + metricPrefix + "long_tail_retry_request.OccurrenceRate").value());
       assertTrue(
           metrics.get("." + storeName + metricPrefix + "success_request_key_count.Rate").value() > 0,
           "Respective success_request_key_count should have been incremented");

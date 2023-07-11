@@ -409,7 +409,6 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
 
   @Test(dataProvider = "FastClient-One-Boolean")
   public void testFastClientWithLongTailRetry(boolean batchGet) throws Exception {
-    batchGet = true;
     ClientConfig.ClientConfigBuilder clientConfigBuilder =
         new ClientConfig.ClientConfigBuilder<>().setStoreName(storeName).setR2Client(r2Client);
 
@@ -428,10 +427,9 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
       clientConfigBuilder.setLongTailRetryEnabledForSingleGet(true)
           .setLongTailRetryThresholdForSingleGetInMicroSeconds(1);
     }
-    boolean finalBatchGet = batchGet;
     fastClientStatsValidation = metricsRepository -> validateMetrics(
         metricsRepository,
-        finalBatchGet, // defaulting useStreamingBatchGetAsDefault to true for batchGet, so using this as indicator
+        batchGet, // defaulting useStreamingBatchGetAsDefault to true for batchGet, so using this as indicator
         recordCnt,
         recordCnt,
         true);
