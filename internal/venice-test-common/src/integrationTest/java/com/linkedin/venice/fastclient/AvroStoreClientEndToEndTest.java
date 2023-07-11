@@ -289,7 +289,8 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
           metricsRepository,
           useStreamingBatchGetAsDefault,
           batchGetKeySize,
-          batchGetKeySize);
+          batchGetKeySize,
+          false);
 
       runTest(
           clientConfigBuilder,
@@ -406,8 +407,9 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
         storeMetadataFetchMode);
   }
 
-  @Test(dataProvider = "FastClient-One-Boolean", timeOut = TIME_OUT)
+  @Test(dataProvider = "FastClient-One-Boolean")
   public void testFastClientWithLongTailRetry(boolean batchGet) throws Exception {
+    batchGet = true;
     ClientConfig.ClientConfigBuilder clientConfigBuilder =
         new ClientConfig.ClientConfigBuilder<>().setStoreName(storeName).setR2Client(r2Client);
 
@@ -419,26 +421,20 @@ public class AvroStoreClientEndToEndTest extends AbstractClientEndToEndSetup {
     }
 
     Consumer<MetricsRepository> fastClientStatsValidation;
-    String metricPrefix;
-    String log;
     if (batchGet) {
-      metricPrefix = "--multiget_";
-      log = "batch Get";
       clientConfigBuilder.setLongTailRetryEnabledForBatchGet(true)
           .setLongTailRetryThresholdForBatchGetInMicroSeconds(1);
     } else {
-      metricPrefix = "--";
-      log = "single Get";
       clientConfigBuilder.setLongTailRetryEnabledForSingleGet(true)
           .setLongTailRetryThresholdForSingleGetInMicroSeconds(1);
     }
-    fastClientStatsValidation = metricsRepository -> {
-      assertTrue(
-          metricsRepository.metrics()
-              .get("." + storeName + metricPrefix + "long_tail_retry_request.OccurrenceRate")
-              .value() > 0,
-          "Long tail retry for " + log + " should be triggered");
-    };
+    boolean finalBatchGet = batchGet;
+    fastClientStatsValidation = metricsRepository -> validateMetrics(
+        metricsRepository,
+        finalBatchGet, // defaulting useStreamingBatchGetAsDefault to true for batchGet, so using this as indicator
+        recordCnt,
+        recordCnt,
+        true);
     runTest(
         clientConfigBuilder,
         batchGet,

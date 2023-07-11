@@ -68,6 +68,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -78,6 +80,7 @@ import org.testng.annotations.DataProvider;
  */
 
 public abstract class AbstractClientEndToEndSetup {
+  private static final Logger LOGGER = LogManager.getLogger(AbstractClientEndToEndSetup.class);
   protected VeniceClusterWrapper veniceCluster;
   protected String storeVersionName;
   protected int valueSchemaId;
@@ -484,7 +487,8 @@ public abstract class AbstractClientEndToEndSetup {
       MetricsRepository metricsRepository,
       boolean useStreamingBatchGetAsDefault,
       int expectedBatchGetKeySizeMetricsCount,
-      int expectedBatchGetKeySizeSuccessMetricsCount) {
+      int expectedBatchGetKeySizeSuccessMetricsCount,
+      boolean retryEnabled) {
     String metricPrefix = useStreamingBatchGetAsDefault ? "--multiget_" : "--";
     double keyCount = useStreamingBatchGetAsDefault ? expectedBatchGetKeySizeMetricsCount : 1;
     double successKeyCount = useStreamingBatchGetAsDefault ? expectedBatchGetKeySizeSuccessMetricsCount : 1;
@@ -498,6 +502,20 @@ public abstract class AbstractClientEndToEndSetup {
           metrics.get("." + storeName + metricPrefix + "request_key_count.Max").value(),
           keyCount,
           "Respective request_key_count should have been incremented");
+      LOGGER.info(
+          "METRICSSSS1 rate:{}, Avg: {}, Max: {}",
+          metrics.get("." + storeName + metricPrefix + "success_request_key_count.Rate").value(),
+          metrics.get("." + storeName + metricPrefix + "success_request_key_count.Avg").value(),
+          metrics.get("." + storeName + metricPrefix + "success_request_key_count.Max").value());
+      String metricPrefix1 = useStreamingBatchGetAsDefault ? "--" : "--multiget_";
+      LOGGER.info(
+          "METRICSSSS2 rate:{}, Avg: {}, Max: {}",
+          metrics.get("." + storeName + metricPrefix1 + "success_request_key_count.Rate").value(),
+          metrics.get("." + storeName + metricPrefix1 + "success_request_key_count.Avg").value(),
+          metrics.get("." + storeName + metricPrefix1 + "success_request_key_count.Max").value());
+      LOGGER.info(
+          "METRICSSS3 retry: {}",
+          metrics.get("." + storeName + metricPrefix + "long_tail_retry_request.OccurrenceRate").value());
       assertTrue(
           metrics.get("." + storeName + metricPrefix + "success_request_key_count.Rate").value() > 0,
           "Respective success_request_key_count should have been incremented");
@@ -512,12 +530,19 @@ public abstract class AbstractClientEndToEndSetup {
             .value() > 0,
         "Incorrect request_key_count should not be incremented");
 
-    // no retry should be triggered as it's not expected to be configured when calling this function
-    metrics.forEach((mName, metric) -> {
-      if (mName.contains("long_tail_retry_request")) {
-        assertTrue(metric.value() == 0, "Long tail retry should not be triggered");
-      }
-    });
+    if (retryEnabled) {
+      String log = useStreamingBatchGetAsDefault ? "batch Get" : "single Get";
+      assertTrue(
+          metrics.get("." + storeName + metricPrefix + "long_tail_retry_request.OccurrenceRate").value() > 0,
+          "Long tail retry for " + log + " should be triggered");
+    } else {
+      // no retry should be triggered as it's not expected to be configured when calling this function
+      metrics.forEach((mName, metric) -> {
+        if (mName.contains("long_tail_retry_request")) {
+          assertTrue(metric.value() == 0, "Long tail retry should not be triggered");
+        }
+      });
+    }
   }
 
   @AfterClass(alwaysRun = true)

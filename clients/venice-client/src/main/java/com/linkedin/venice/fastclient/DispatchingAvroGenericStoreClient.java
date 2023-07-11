@@ -1,5 +1,6 @@
 package com.linkedin.venice.fastclient;
 
+import com.linkedin.alpini.base.concurrency.TimeoutProcessor;
 import com.linkedin.restli.common.HttpStatus;
 import com.linkedin.venice.HttpConstants;
 import com.linkedin.venice.client.exceptions.VeniceClientException;
@@ -39,6 +40,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import org.apache.avro.Schema;
@@ -202,8 +204,22 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
       try {
         String url = route + uri;
         CompletableFuture<TransportClientResponse> transportFuture = transportClient.get(url);
+        // TODO: Temp fix to duplicate timeout logic like in trackHealthBasedOnRequestToInstance
+        // A clean fix would be to just have 1 timeoutFuture and close both timeoutFuture as well as requestFuture
+        TimeoutProcessor.TimeoutFuture timeoutFuture = metadata.getInstanceHealthMonitor()
+            .getTimeoutProcessor()
+            .schedule(
+                /** Using a special http status to indicate the leaked request */
+                () -> transportFuture.completeExceptionally(
+                    new VeniceClientException(String.valueOf(HttpStatus.S_503_SERVICE_UNAVAILABLE))),
+                config.getRoutingLeakedRequestCleanupThresholdMS(),
+                TimeUnit.MILLISECONDS);
+
         transportFutures.add(transportFuture);
         transportFuture.whenCompleteAsync((response, throwable) -> {
+          if (!timeoutFuture.isDone()) {
+            timeoutFuture.cancel();
+          }
           if (throwable != null) {
             HttpStatus statusCode = (throwable instanceof VeniceClientHttpException)
                 ? HttpStatus.fromCode(((VeniceClientHttpException) throwable).getHttpStatus())
@@ -446,11 +462,28 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
       byte[] serializedKeys = serializeMultiGetRequest(requestContext.keysForRoutes(route));
       requestContext.recordRequestSerializationTime(route, getLatencyInNS(tsBeforeSerialization));
       requestContext.recordRequestSentTimeStamp(route);
-      transportClient.post(url, headers, serializedKeys).whenComplete((transportClientResponse, throwable) -> {
+      CompletableFuture routeFuture = transportClient.post(url, headers, serializedKeys);
+
+      // TODO:
+      // 1. Check how streaming batch get updates route health counters! If it doesn't, then it needs to be added
+      // 2. See how to add the below logic in a better manner
+      TimeoutProcessor.TimeoutFuture timeoutFuture = metadata.getInstanceHealthMonitor()
+          .getTimeoutProcessor()
+          .schedule(
+              /** Using a special http status to indicate the leaked request */
+              () -> routeFuture.completeExceptionally(
+                  new VeniceClientException(String.valueOf(HttpStatus.S_503_SERVICE_UNAVAILABLE))),
+              config.getRoutingLeakedRequestCleanupThresholdMS(),
+              TimeUnit.MILLISECONDS);
+
+      routeFuture.whenComplete((transportClientResponse, throwable) -> {
+        if (!timeoutFuture.isDone()) {
+          timeoutFuture.cancel();
+        }
         requestContext.recordRequestSubmissionToResponseHandlingTime(route);
-        TransportClientResponseForRoute response =
-            TransportClientResponseForRoute.fromTransportClientWithRoute(transportClientResponse, route);
-        transportClientResponseCompletionHandler.accept(response, throwable);
+        TransportClientResponseForRoute response = TransportClientResponseForRoute
+            .fromTransportClientWithRoute((TransportClientResponse) transportClientResponse, route);
+        transportClientResponseCompletionHandler.accept(response, (Throwable) throwable);
       });
     }
   }
