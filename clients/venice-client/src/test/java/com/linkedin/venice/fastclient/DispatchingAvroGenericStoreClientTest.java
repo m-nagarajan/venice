@@ -42,6 +42,7 @@ import org.testng.annotations.Test;
 
 
 public class DispatchingAvroGenericStoreClientTest {
+  private static final int TEST_TIMEOUT = 10 * Time.MS_PER_SECOND;
   private static final String SINGLE_GET_VALUE_RESPONSE = "test_value";
   private static final String STORE_NAME = "test_store";
   private static final Set<String> BATCH_GET_KEYS = new HashSet<>();
@@ -72,13 +73,13 @@ public class DispatchingAvroGenericStoreClientTest {
   }
 
   private void setUpClient(boolean useStreamingBatchGetAsDefault, boolean transportClientThrowsException) {
-    setUpClient(useStreamingBatchGetAsDefault, transportClientThrowsException, false, TimeUnit.SECONDS.toMillis(30));
+    setUpClient(useStreamingBatchGetAsDefault, transportClientThrowsException, true, TimeUnit.SECONDS.toMillis(30));
   }
 
   private void setUpClient(
       boolean useStreamingBatchGetAsDefault,
       boolean transportClientThrowsException,
-      boolean dontMockTransportClient,
+      boolean mockTransportClient,
       long routingLeakedRequestCleanupThresholdMS) {
     clientConfigBuilder = new ClientConfig.ClientConfigBuilder<>().setStoreName(STORE_NAME)
         .setR2Client(mock(Client.class))
@@ -92,23 +93,34 @@ public class DispatchingAvroGenericStoreClientTest {
     storeMetadata = RequestBasedMetadataTestUtils.getMockMetaData(clientConfig, STORE_NAME);
     CompletableFuture<TransportClientResponse> valueFuture = new CompletableFuture<>();
 
-    TransportClient mockTransportClient = null;
-    if (!dontMockTransportClient) {
-      mockTransportClient = mock(TransportClient.class);
+    TransportClient mockedTransportClient = null;
+    if (mockTransportClient) {
+      mockedTransportClient = mock(TransportClient.class);
       dispatchingAvroGenericStoreClient =
-          new DispatchingAvroGenericStoreClient(storeMetadata, clientConfig, mockTransportClient);
+          new DispatchingAvroGenericStoreClient(storeMetadata, clientConfig, mockedTransportClient);
     } else {
       dispatchingAvroGenericStoreClient = new DispatchingAvroGenericStoreClient(storeMetadata, clientConfig);
     }
     statsAvroGenericStoreClient = new StatsAvroGenericStoreClient(dispatchingAvroGenericStoreClient, clientConfig);
     statsAvroGenericStoreClient.start();
 
-    // Initialize metadata
-    dispatchingAvroGenericStoreClient.verifyMetadataInitialized();
+    // Wait till metadata is initialized
+    while (true) {
+      try {
+        dispatchingAvroGenericStoreClient.verifyMetadataInitialized();
+        break;
+      } catch (VeniceClientException e) {
+        if (e.getMessage().endsWith("metadata is not ready, attempting to re-initialize")) {
+          // retry until its initialized
+          continue;
+        }
+        throw e;
+      }
+    }
 
-    if (!dontMockTransportClient) {
+    if (mockTransportClient) {
       // mock get()
-      doReturn(valueFuture).when(mockTransportClient).get(any());
+      doReturn(valueFuture).when(mockedTransportClient).get(any());
       if (!transportClientThrowsException) {
         TransportClientResponse singleGetResponse = new TransportClientResponse(
             1,
@@ -130,10 +142,10 @@ public class DispatchingAvroGenericStoreClientTest {
             1,
             CompressionStrategy.NO_OP,
             serializeBatchGetResponse(BATCH_GET_KEYS));
-        doReturn(batchGetValueFuture).when(mockTransportClient).post(any(), any(), any());
+        doReturn(batchGetValueFuture).when(mockedTransportClient).post(any(), any(), any());
         batchGetValueFuture.complete(batchGetResponse);
       } else {
-        doReturn(batchGetValueFuture).when(mockTransportClient).post(any(), any(), any());
+        doReturn(batchGetValueFuture).when(mockedTransportClient).post(any(), any(), any());
         batchGetValueFuture.completeExceptionally(new VeniceClientException("Exception for client to return 503"));
       }
     }
@@ -203,7 +215,7 @@ public class DispatchingAvroGenericStoreClientTest {
     return dispatchingAvroGenericStoreClient.getMultiGetSerializer().serializeObjects(routerRequestValues);
   }
 
-  @Test
+  @Test(timeOut = TEST_TIMEOUT)
   public void testGet() throws ExecutionException, InterruptedException, IOException {
     try {
       setUpClient();
@@ -227,7 +239,7 @@ public class DispatchingAvroGenericStoreClientTest {
     }
   }
 
-  @Test
+  @Test(timeOut = TEST_TIMEOUT)
   public void testGetWithExceptionFromTransportLayer() throws IOException {
     try {
       setUpClient(false, true);
@@ -253,10 +265,10 @@ public class DispatchingAvroGenericStoreClientTest {
     }
   }
 
-  @Test(timeOut = 10 * Time.MS_PER_SECOND)
+  @Test(timeOut = TEST_TIMEOUT)
   public void testGetToUnreachableClient() throws IOException {
     try {
-      setUpClient(false, false, true, 2 * Time.MS_PER_SECOND);
+      setUpClient(false, false, false, 2 * Time.MS_PER_SECOND);
       getRequestContext = new GetRequestContext();
       statsAvroGenericStoreClient.get(getRequestContext, "test_key").get();
       fail();
@@ -279,7 +291,7 @@ public class DispatchingAvroGenericStoreClientTest {
     }
   }
 
-  @Test(dataProvider = "True-and-False", dataProviderClass = DataProviderUtils.class)
+  @Test(dataProvider = "True-and-False", dataProviderClass = DataProviderUtils.class, timeOut = TEST_TIMEOUT)
   public void testBatchGet(boolean useStreamingBatchGetAsDefault)
       throws ExecutionException, InterruptedException, IOException {
 
@@ -327,7 +339,7 @@ public class DispatchingAvroGenericStoreClientTest {
     }
   }
 
-  @Test(dataProvider = "True-and-False", dataProviderClass = DataProviderUtils.class)
+  @Test(dataProvider = "True-and-False", dataProviderClass = DataProviderUtils.class, timeOut = TEST_TIMEOUT)
   public void testBatchGetWithExceptionFromTransportLayer(boolean useStreamingBatchGetAsDefault) throws IOException {
     try {
       setUpClient(useStreamingBatchGetAsDefault, true);
@@ -362,10 +374,10 @@ public class DispatchingAvroGenericStoreClientTest {
     }
   }
 
-  @Test(dataProvider = "True-and-False", dataProviderClass = DataProviderUtils.class, timeOut = 10 * Time.MS_PER_SECOND)
+  @Test(dataProvider = "True-and-False", dataProviderClass = DataProviderUtils.class, timeOut = TEST_TIMEOUT)
   public void testBatchGetToUnreachableClient(boolean useStreamingBatchGetAsDefault) throws IOException {
     try {
-      setUpClient(useStreamingBatchGetAsDefault, false, true, 2 * Time.MS_PER_SECOND);
+      setUpClient(useStreamingBatchGetAsDefault, false, false, 2 * Time.MS_PER_SECOND);
       batchGetRequestContext = new BatchGetRequestContext<>();
       statsAvroGenericStoreClient.batchGet(batchGetRequestContext, BATCH_GET_KEYS).get();
       fail();
