@@ -1,11 +1,13 @@
 package com.linkedin.venice.fastclient.meta;
 
+import com.linkedin.restli.common.HttpStatus;
 import com.linkedin.venice.client.exceptions.VeniceClientException;
 import com.linkedin.venice.client.store.AvroSpecificStoreClient;
 import com.linkedin.venice.exceptions.MissingKeyInStoreMetadataException;
 import com.linkedin.venice.fastclient.ClientConfig;
 import com.linkedin.venice.systemstore.schemas.StoreMetaKey;
 import com.linkedin.venice.systemstore.schemas.StoreMetaValue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 
@@ -39,5 +41,13 @@ public class ThinClientBasedMetadata extends VeniceClientBasedMetadata {
           "Failed to get data from thin client meta store for store: " + storeName + " with key: " + key.toString(),
           e);
     }
+  }
+
+  @Override
+  public CompletableFuture<HttpStatus> trackHealthBasedOnRequestToInstance(
+      String instance,
+      int version,
+      int partitionId) {
+    return null;
   }
 }

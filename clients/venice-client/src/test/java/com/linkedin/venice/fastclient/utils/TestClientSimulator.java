@@ -10,6 +10,7 @@ import com.linkedin.r2.message.rest.RestRequest;
 import com.linkedin.r2.message.rest.RestResponse;
 import com.linkedin.r2.message.rest.RestResponseBuilder;
 import com.linkedin.r2.transport.common.Client;
+import com.linkedin.restli.common.HttpStatus;
 import com.linkedin.venice.client.store.AvroGenericStoreClient;
 import com.linkedin.venice.compression.CompressionStrategy;
 import com.linkedin.venice.compression.CompressorFactory;
@@ -553,6 +554,14 @@ public class TestClientSimulator implements Client {
               .filter(r -> routeToPartitions.get(r).contains(partitionId))
               .collect(Collectors.toList());
         }
+      }
+
+      @Override
+      public CompletableFuture<HttpStatus> trackHealthBasedOnRequestToInstance(
+          String instance,
+          int version,
+          int partitionId) {
+        return null;
       }
 
       @Override

@@ -2,6 +2,8 @@ package com.linkedin.venice.fastclient.meta;
 
 import com.linkedin.alpini.base.concurrency.TimeoutProcessor;
 import com.linkedin.restli.common.HttpStatus;
+import com.linkedin.venice.client.exceptions.VeniceClientHttpException;
+import com.linkedin.venice.client.store.transport.TransportClientResponse;
 import com.linkedin.venice.fastclient.ClientConfig;
 import com.linkedin.venice.utils.concurrent.VeniceConcurrentHashMap;
 import java.io.Closeable;
@@ -67,6 +69,10 @@ public class InstanceHealthMonitor implements Closeable {
     return this.timeoutProcessor;
   }
 
+  public CompletableFuture<HttpStatus> trackHealthBasedOnRequestToInstance(String instance) {
+    return trackHealthBasedOnRequestToInstance(instance, null);
+  }
+
   /**
    * This function tracks the health of an Instance based on the request sent to that Instance:
    * by returning an incomplete completable future for {@link AbstractStoreMetadata} which
@@ -77,7 +83,9 @@ public class InstanceHealthMonitor implements Closeable {
    *
    * Using this we can track the number of pending requests for each server instance.
    */
-  public CompletableFuture<HttpStatus> trackHealthBasedOnRequestToInstance(String instance) {
+  public CompletableFuture<HttpStatus> trackHealthBasedOnRequestToInstance(
+      String instance,
+      CompletableFuture<TransportClientResponse> transportFuture) {
     CompletableFuture<HttpStatus> requestFuture = new CompletableFuture<>();
     pendingRequestCounterMap.compute(instance, (k, v) -> {
       if (v == null) {
@@ -88,7 +96,13 @@ public class InstanceHealthMonitor implements Closeable {
 
     TimeoutProcessor.TimeoutFuture timeoutFuture = timeoutProcessor.schedule(
         /** Using a special http status to indicate the leaked request */
-        () -> requestFuture.complete(HttpStatus.S_410_GONE),
+        () -> {
+          // requestFuture.complete(HttpStatus.S_410_GONE);
+          if (transportFuture != null) {
+            transportFuture.completeExceptionally(
+                new VeniceClientHttpException("Request timed out", HttpStatus.S_410_GONE.getCode()));
+          }
+        },
         clientConfig.getRoutingLeakedRequestCleanupThresholdMS(),
         TimeUnit.MILLISECONDS);
 

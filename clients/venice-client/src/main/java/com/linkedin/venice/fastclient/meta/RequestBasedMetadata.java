@@ -1,5 +1,6 @@
 package com.linkedin.venice.fastclient.meta;
 
+import com.linkedin.restli.common.HttpStatus;
 import com.linkedin.venice.client.exceptions.VeniceClientException;
 import com.linkedin.venice.client.store.D2ServiceDiscovery;
 import com.linkedin.venice.client.store.transport.D2TransportClient;
@@ -106,6 +107,14 @@ public class RequestBasedMetadata extends AbstractStoreMetadata {
   public List<String> getReplicas(int version, int partitionId) {
     String key = getVersionPartitionMapKey(version, partitionId);
     return readyToServeInstancesMap.getOrDefault(key, Collections.emptyList());
+  }
+
+  @Override
+  public CompletableFuture<HttpStatus> trackHealthBasedOnRequestToInstance(
+      String instance,
+      int version,
+      int partitionId) {
+    return null;
   }
 
   private String getVersionPartitionMapKey(int version, int partition) {

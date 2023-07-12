@@ -198,35 +198,36 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
     List<CompletableFuture<TransportClientResponse>> transportFutures = new LinkedList<>();
     requestContext.requestSentTimestampNS = System.nanoTime();
     for (String route: routes) {
-      CompletableFuture<HttpStatus> routeRequestFuture =
-          metadata.trackHealthBasedOnRequestToInstance(route, currentVersion, partitionId);
-      requestContext.routeRequestMap.put(route, routeRequestFuture);
+      CompletableFuture<HttpStatus> routeRequestFuture = null;
       try {
         String url = route + uri;
         CompletableFuture<TransportClientResponse> transportFuture = transportClient.get(url);
+        routeRequestFuture = metadata.trackHealthBasedOnRequestToInstance(route, currentVersion, partitionId, transportFuture);
+        requestContext.routeRequestMap.put(route, routeRequestFuture);
         // TODO: Temp fix to duplicate timeout logic like in trackHealthBasedOnRequestToInstance
         // A clean fix would be to just have 1 timeoutFuture and close both timeoutFuture as well as requestFuture
-        TimeoutProcessor.TimeoutFuture timeoutFuture = metadata.getInstanceHealthMonitor()
+        /*TimeoutProcessor.TimeoutFuture timeoutFuture = metadata.getInstanceHealthMonitor()
             .getTimeoutProcessor()
             .schedule(
-                /** Using a special http status to indicate the leaked request */
+                *//** Using a special http status to indicate the leaked request *//*
                 () -> transportFuture.completeExceptionally(
                     new VeniceClientHttpException("Request timed out", HttpStatus.S_410_GONE.getCode())),
                 config.getRoutingLeakedRequestCleanupThresholdMS(),
-                TimeUnit.MILLISECONDS);
+                TimeUnit.MILLISECONDS);*/
 
         transportFutures.add(transportFuture);
+        CompletableFuture<HttpStatus> finalRouteRequestFuture = routeRequestFuture;
         transportFuture.whenCompleteAsync((response, throwable) -> {
-          if (!timeoutFuture.isDone()) {
+          /*if (!timeoutFuture.isDone()) {
             timeoutFuture.cancel();
-          }
+          }*/
           if (throwable != null) {
             HttpStatus statusCode = (throwable instanceof VeniceClientHttpException)
                 ? HttpStatus.fromCode(((VeniceClientHttpException) throwable).getHttpStatus())
                 : HttpStatus.S_503_SERVICE_UNAVAILABLE;
-            routeRequestFuture.complete(statusCode);
+            finalRouteRequestFuture.complete(statusCode);
           } else if (response == null) {
-            routeRequestFuture.complete(HttpStatus.S_404_NOT_FOUND);
+            finalRouteRequestFuture.complete(HttpStatus.S_404_NOT_FOUND);
             if (!receivedSuccessfulResponse.getAndSet(true)) {
               requestContext.requestSubmissionToResponseHandlingTime =
                   LatencyUtils.getLatencyInMS(timestampBeforeSendingRequest);
@@ -235,7 +236,7 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
             }
           } else {
             try {
-              routeRequestFuture.complete(HttpStatus.S_200_OK);
+              finalRouteRequestFuture.complete(HttpStatus.S_200_OK);
               if (!receivedSuccessfulResponse.getAndSet(true)) {
                 requestContext.requestSubmissionToResponseHandlingTime =
                     LatencyUtils.getLatencyInMS(timestampBeforeSendingRequest);
@@ -264,6 +265,11 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
         }, deserializationExecutor);
       } catch (Exception e) {
         LOGGER.error("Received exception while sending request to route: {}", route, e);
+        if (routeRequestFuture == null) {
+          // to update health data, create a future if the exception was thrown before it could be created
+          routeRequestFuture = metadata.trackHealthBasedOnRequestToInstance(route, currentVersion, partitionId);
+          requestContext.routeRequestMap.put(route, routeRequestFuture);
+        }
         routeRequestFuture.complete(HttpStatus.S_503_SERVICE_UNAVAILABLE);
       }
     }
@@ -463,23 +469,25 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
       requestContext.recordRequestSerializationTime(route, getLatencyInNS(tsBeforeSerialization));
       requestContext.recordRequestSentTimeStamp(route);
       CompletableFuture routeFuture = transportClient.post(url, headers, serializedKeys);
+      CompletableFuture<HttpStatus> routeRequestFuture = metadata.trackHealthBasedOnRequestToInstance(route, currentVersion, 0, routeFuture);
+      requestContext.routeRequestMap.put(route, routeRequestFuture);
 
       // TODO:
       // 1. Check how streaming batch get updates route health counters! If it doesn't, then it needs to be added
       // 2. See how to add the below logic in a better manner
-      TimeoutProcessor.TimeoutFuture timeoutFuture = metadata.getInstanceHealthMonitor()
+/*      TimeoutProcessor.TimeoutFuture timeoutFuture = metadata.getInstanceHealthMonitor()
           .getTimeoutProcessor()
           .schedule(
-              /** Using a special http status to indicate the leaked request */
+              *//** Using a special http status to indicate the leaked request *//*
               () -> routeFuture.completeExceptionally(
                   new VeniceClientHttpException("Request timed out", HttpStatus.S_410_GONE.getCode())),
               config.getRoutingLeakedRequestCleanupThresholdMS(),
-              TimeUnit.MILLISECONDS);
+              TimeUnit.MILLISECONDS);*/
 
       routeFuture.whenComplete((transportClientResponse, throwable) -> {
-        if (!timeoutFuture.isDone()) {
+/*        if (!timeoutFuture.isDone()) {
           timeoutFuture.cancel();
-        }
+        }*/
         requestContext.recordRequestSubmissionToResponseHandlingTime(route);
         TransportClientResponseForRoute response = TransportClientResponseForRoute
             .fromTransportClientWithRoute((TransportClientResponse) transportClientResponse, route);

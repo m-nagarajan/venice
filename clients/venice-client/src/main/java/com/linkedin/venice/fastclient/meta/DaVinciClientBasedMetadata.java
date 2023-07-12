@@ -1,11 +1,13 @@
 package com.linkedin.venice.fastclient.meta;
 
 import com.linkedin.davinci.client.DaVinciClient;
+import com.linkedin.restli.common.HttpStatus;
 import com.linkedin.venice.client.exceptions.VeniceClientException;
 import com.linkedin.venice.exceptions.MissingKeyInStoreMetadataException;
 import com.linkedin.venice.fastclient.ClientConfig;
 import com.linkedin.venice.systemstore.schemas.StoreMetaKey;
 import com.linkedin.venice.systemstore.schemas.StoreMetaValue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 
@@ -28,6 +30,14 @@ public class DaVinciClientBasedMetadata extends VeniceClientBasedMetadata {
           "'daVinciClient' should not be null in when DaVinciClientBasedMetadata is being used.");
     }
     this.daVinciClient = daVinciClient;
+  }
+
+  @Override
+  public CompletableFuture<HttpStatus> trackHealthBasedOnRequestToInstance(
+      String instance,
+      int version,
+      int partitionId) {
+    return null;
   }
 
   @Override
