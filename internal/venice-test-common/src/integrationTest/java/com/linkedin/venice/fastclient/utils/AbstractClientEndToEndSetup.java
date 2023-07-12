@@ -483,7 +483,11 @@ public abstract class AbstractClientEndToEndSetup {
             .setSslFactory(SslUtils.getVeniceLocalSslFactory()));
   }
 
-  protected void validateMetrics(
+  protected void validateSingleGetMetrics(MetricsRepository metricsRepository, boolean retryEnabled) {
+    validateBatchGetMetrics(metricsRepository, false, 0, 0, retryEnabled);
+  }
+
+  protected void validateBatchGetMetrics(
       MetricsRepository metricsRepository,
       boolean useStreamingBatchGetAsDefault,
       int expectedBatchGetKeySizeMetricsCount,
