@@ -1,6 +1,5 @@
 package com.linkedin.venice.fastclient;
 
-import com.linkedin.alpini.base.concurrency.TimeoutProcessor;
 import com.linkedin.restli.common.HttpStatus;
 import com.linkedin.venice.HttpConstants;
 import com.linkedin.venice.client.exceptions.VeniceClientException;
@@ -40,7 +39,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import org.apache.avro.Schema;
@@ -202,25 +200,13 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
       try {
         String url = route + uri;
         CompletableFuture<TransportClientResponse> transportFuture = transportClient.get(url);
-        routeRequestFuture = metadata.trackHealthBasedOnRequestToInstance(route, currentVersion, partitionId, transportFuture);
+        routeRequestFuture =
+            metadata.trackHealthBasedOnRequestToInstance(route, currentVersion, partitionId, transportFuture);
         requestContext.routeRequestMap.put(route, routeRequestFuture);
-        // TODO: Temp fix to duplicate timeout logic like in trackHealthBasedOnRequestToInstance
-        // A clean fix would be to just have 1 timeoutFuture and close both timeoutFuture as well as requestFuture
-        /*TimeoutProcessor.TimeoutFuture timeoutFuture = metadata.getInstanceHealthMonitor()
-            .getTimeoutProcessor()
-            .schedule(
-                *//** Using a special http status to indicate the leaked request *//*
-                () -> transportFuture.completeExceptionally(
-                    new VeniceClientHttpException("Request timed out", HttpStatus.S_410_GONE.getCode())),
-                config.getRoutingLeakedRequestCleanupThresholdMS(),
-                TimeUnit.MILLISECONDS);*/
 
         transportFutures.add(transportFuture);
         CompletableFuture<HttpStatus> finalRouteRequestFuture = routeRequestFuture;
         transportFuture.whenCompleteAsync((response, throwable) -> {
-          /*if (!timeoutFuture.isDone()) {
-            timeoutFuture.cancel();
-          }*/
           if (throwable != null) {
             HttpStatus statusCode = (throwable instanceof VeniceClientHttpException)
                 ? HttpStatus.fromCode(((VeniceClientHttpException) throwable).getHttpStatus())
@@ -450,7 +436,7 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
         requestContext.setPartialResponseException(new VeniceClientException(errorMessage));
       }
 
-      /* Add this key into each route  we are going to send request to.
+      /* Add this key into each route we are going to send request to.
         Current implementation has only one replica/route count , so each key will go via one route.
         For loop is not necessary here but if in the future we send to multiple routes then the code below remains */
       for (String route: routes) {
@@ -468,30 +454,15 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
       byte[] serializedKeys = serializeMultiGetRequest(requestContext.keysForRoutes(route));
       requestContext.recordRequestSerializationTime(route, getLatencyInNS(tsBeforeSerialization));
       requestContext.recordRequestSentTimeStamp(route);
-      CompletableFuture routeFuture = transportClient.post(url, headers, serializedKeys);
-      CompletableFuture<HttpStatus> routeRequestFuture = metadata.trackHealthBasedOnRequestToInstance(route, currentVersion, 0, routeFuture);
-      requestContext.routeRequestMap.put(route, routeRequestFuture);
-
-      // TODO:
-      // 1. Check how streaming batch get updates route health counters! If it doesn't, then it needs to be added
-      // 2. See how to add the below logic in a better manner
-/*      TimeoutProcessor.TimeoutFuture timeoutFuture = metadata.getInstanceHealthMonitor()
-          .getTimeoutProcessor()
-          .schedule(
-              *//** Using a special http status to indicate the leaked request *//*
-              () -> routeFuture.completeExceptionally(
-                  new VeniceClientHttpException("Request timed out", HttpStatus.S_410_GONE.getCode())),
-              config.getRoutingLeakedRequestCleanupThresholdMS(),
-              TimeUnit.MILLISECONDS);*/
+      CompletableFuture<TransportClientResponse> routeFuture = transportClient.post(url, headers, serializedKeys);
+      CompletableFuture<HttpStatus> routeRequestFuture =
+          metadata.trackHealthBasedOnRequestToInstance(route, currentVersion, 0, routeFuture);
 
       routeFuture.whenComplete((transportClientResponse, throwable) -> {
-/*        if (!timeoutFuture.isDone()) {
-          timeoutFuture.cancel();
-        }*/
         requestContext.recordRequestSubmissionToResponseHandlingTime(route);
         TransportClientResponseForRoute response = TransportClientResponseForRoute
-            .fromTransportClientWithRoute((TransportClientResponse) transportClientResponse, route);
-        transportClientResponseCompletionHandler.accept(response, (Throwable) throwable);
+            .fromTransportClientWithRoute(transportClientResponse, route, routeRequestFuture);
+        transportClientResponseCompletionHandler.accept(response, throwable);
       });
     }
   }
@@ -508,6 +479,10 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
     if (exception != null) {
       LOGGER.error("Exception received from transport. ExMsg: {}", exception.getMessage());
       requestContext.markCompleteExceptionally(transportClientResponse, exception);
+      HttpStatus statusCode = (exception instanceof VeniceClientHttpException)
+          ? HttpStatus.fromCode(((VeniceClientHttpException) exception).getHttpStatus())
+          : HttpStatus.S_503_SERVICE_UNAVAILABLE;
+      transportClientResponse.getRouteRequestFuture().complete(statusCode);
       return;
     }
     // deserialize records and find the status
@@ -554,6 +529,7 @@ public class DispatchingAvroGenericStoreClient<K, V> extends InternalAvroStoreCl
       }
     }
     requestContext.markComplete(transportClientResponse);
+    transportClientResponse.getRouteRequestFuture().complete(HttpStatus.S_200_OK);
   }
 
   /* Batch get helper methods */

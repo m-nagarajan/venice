@@ -141,7 +141,8 @@ public class DispatchingAvroGenericStoreClientTest {
             "0",
             1,
             CompressionStrategy.NO_OP,
-            serializeBatchGetResponse(BATCH_GET_KEYS));
+            serializeBatchGetResponse(BATCH_GET_KEYS),
+            mock(CompletableFuture.class));
         doReturn(batchGetValueFuture).when(mockedTransportClient).post(any(), any(), any());
         batchGetValueFuture.complete(batchGetResponse);
       } else {

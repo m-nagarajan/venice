@@ -91,7 +91,7 @@ public class InstanceHealthMonitor implements Closeable {
       if (v == null) {
         return 1;
       }
-      return v + 1;
+      return v + 1; // currently tracking the number of requests as 1 for both single get and batchGet
     });
 
     TimeoutProcessor.TimeoutFuture timeoutFuture = timeoutProcessor.schedule(
@@ -119,7 +119,6 @@ public class InstanceHealthMonitor implements Closeable {
       }
 
       if (!timeoutFuture.isDone()) {
-        // TODO check for race conditions
         timeoutFuture.cancel();
       }
 
