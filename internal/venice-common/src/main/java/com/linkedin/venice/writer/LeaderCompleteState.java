@@ -10,18 +10,25 @@ import com.linkedin.venice.utils.VeniceEnumValue;
  */
 public enum LeaderCompleteState implements VeniceEnumValue {
   /**
-   * Leader partition is not marked completed yet
+   * Leader partition is not completed yet
    */
   LEADER_NOT_COMPLETED(0),
   /**
-   * Leader partition is marked completed
+   * Leader partition is completed
    */
   LEADER_COMPLETED(1),
   /**
-   * Default state for the standby to know that the feature is not supported, to
-   * not consider leader's completion status for its completion.
+   * Heartbeat is not received yet: Hybrid standby replica will wait for the first heartbeat
+   * to arrive before marking itself completed.
    */
-  NOT_SUPPORTED(2);
+  LEADER_COMPLETE_STATE_UNKNOWN(2);
+
+  /**
+   * - Default state of the replicas to start with
+   * - Heartbeat is received without leader state header: standby will not wait for the leader to complete.
+   * This will be a temporary state until the supported version is deployed to all servers
+   */
+  // LEADER_COMPLETE_STATE_HEADER_NOT_SUPPORTED(3);
 
   private final int value;
   private static final LeaderCompleteState[] TYPES_ARRAY = EnumUtils.getEnumValuesArray(LeaderCompleteState.class);

@@ -1377,6 +1377,7 @@ public class ActiveActiveStoreIngestionTask extends LeaderFollowerStoreIngestion
     }
   }
 
+  /** used for metric purposes **/
   @Override
   public boolean isReadyToServeAnnouncedWithRTLag() {
     if (!hybridStoreConfig.isPresent() || partitionConsumptionStateMap.isEmpty()) {

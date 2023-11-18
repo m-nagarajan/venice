@@ -3510,8 +3510,12 @@ public abstract class StoreIngestionTaskTest {
     Assert.assertTrue(storeIngestionTask.maybeSetIngestionTaskActiveState(false));
   }
 
-  @Test(dataProvider = "True-and-False", dataProviderClass = DataProviderUtils.class)
-  public void testMaybeSendIngestionHeartbeat(boolean isActiveActive) {
+  @Test(dataProvider = "Four-True-and-False", dataProviderClass = DataProviderUtils.class)
+  public void testMaybeSendIngestionHeartbeat(
+      boolean isActiveActive,
+      boolean isRealTimeTopic,
+      boolean isLeader,
+      boolean isHybridStore) {
     String storeName = Utils.getUniqueString("store");
     Store mockStore = mock(Store.class);
     String versionTopic = Version.composeKafkaTopic(storeName, 1);
@@ -3521,8 +3525,12 @@ public abstract class StoreIngestionTaskTest {
     doReturn(1).when(mockVersion).getPartitionCount();
     doReturn(VersionStatus.STARTED).when(mockVersion).getStatus();
     doReturn(true).when(mockVersion).isUseVersionLevelHybridConfig();
-    HybridStoreConfig mockHybridConfig = mock(HybridStoreConfig.class);
-    doReturn(mockHybridConfig).when(mockVersion).getHybridStoreConfig();
+    if (isHybridStore) {
+      HybridStoreConfig mockHybridConfig = mock(HybridStoreConfig.class);
+      doReturn(mockHybridConfig).when(mockVersion).getHybridStoreConfig();
+    } else {
+      doReturn(null).when(mockVersion).getHybridStoreConfig();
+    }
     Properties mockKafkaConsumerProperties = mock(Properties.class);
     doReturn("localhost").when(mockKafkaConsumerProperties).getProperty(eq(KAFKA_BOOTSTRAP_SERVERS));
     ReadOnlyStoreRepository mockReadOnlyStoreRepository = mock(ReadOnlyStoreRepository.class);
@@ -3540,10 +3548,10 @@ public abstract class StoreIngestionTaskTest {
     PartitionConsumptionState pcs = mock(PartitionConsumptionState.class);
     OffsetRecord offsetRecord = mock(OffsetRecord.class);
     doReturn(offsetRecord).when(pcs).getOffsetRecord();
-    doReturn(LEADER).when(pcs).getLeaderFollowerState();
+    doReturn(isLeader ? LEADER : STANDBY).when(pcs).getLeaderFollowerState();
     PubSubTopic pubsubTopic = mock(PubSubTopic.class);
     doReturn(pubsubTopic).when(offsetRecord).getLeaderTopic(any());
-    doReturn(true).when(pubsubTopic).isRealTime();
+    doReturn(isRealTimeTopic).when(pubsubTopic).isRealTime();
 
     VeniceWriter veniceWriter = mock(VeniceWriter.class);
     VeniceWriterFactory veniceWriterFactory = mock(VeniceWriterFactory.class);
@@ -3572,7 +3580,27 @@ public abstract class StoreIngestionTaskTest {
     ingestionTask.maybeSendIngestionHeartbeat();
     // Second invocation should be skipped since it shouldn't be time for another heartbeat yet.
     ingestionTask.maybeSendIngestionHeartbeat();
-    verify(veniceWriter, times(1)).sendHeartbeat(any(), any(), any());
+    if (isHybridStore && isRealTimeTopic && isLeader) {
+      verify(veniceWriter, times(1)).sendHeartbeat(any(), any(), any());
+    } else {
+      verify(veniceWriter, never()).sendHeartbeat(any(), any(), any());
+    }
+  }
+
+  @Test
+  public void testGetAndUpdateLeaderCompletedState() {
+    /*   LeaderFollowerStoreIngestionTask storeIngestionTask = mock(LeaderFollowerStoreIngestionTask.class);
+    doCallRealMethod().when(storeIngestionTask).getLeaderCompletedState(any());
+    doCallRealMethod().when(storeIngestionTask).updateLeaderCompletedState(any(), anyBoolean());
+    PartitionConsumptionState partitionConsumptionState = mock(PartitionConsumptionState.class);
+    when(partitionConsumptionState.getLeaderFollowerState()).thenReturn(LEADER);
+    when(partitionConsumptionState.isCompletionReported()).thenReturn(true);
+    when(partitionConsumptionState.isErrorReported()).thenReturn(false);
+    when(partitionConsumptionState.isSubscribed()).thenReturn(true);
+    when(partitionConsumptionState.isLeaderCompleted()).thenReturn(true);
+    Assert.assertTrue(storeIngestionTask.getLeaderCompletedState(partitionConsumptionState));
+    storeIngestionTask.updateLeaderCompletedState(partitionConsumptionState, false);
+    Assert.assertFalse(storeIngestionTask.getLeaderCompletedState(partitionConsumptionState));*/
   }
 
   private VeniceStoreVersionConfig getDefaultMockVeniceStoreVersionConfig(
