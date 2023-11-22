@@ -811,7 +811,7 @@ public class PartitionConsumptionState {
   }
 
   public boolean isLeaderCompleted() {
-    return leaderCompleteState == LeaderCompleteState.LEADER_COMPLETED;
+    return getLeaderCompleteState() == LeaderCompleteState.LEADER_COMPLETED;
   }
 
   public LeaderCompleteState getLeaderCompleteState() {

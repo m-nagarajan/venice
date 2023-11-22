@@ -3,6 +3,7 @@ package com.linkedin.davinci.kafka.consumer;
 import static com.linkedin.davinci.kafka.consumer.ConsumerActionType.RESET_OFFSET;
 import static com.linkedin.davinci.kafka.consumer.ConsumerActionType.SUBSCRIBE;
 import static com.linkedin.davinci.kafka.consumer.ConsumerActionType.UNSUBSCRIBE;
+import static com.linkedin.davinci.kafka.consumer.LeaderFollowerStateType.STANDBY;
 import static com.linkedin.venice.ConfigKeys.KAFKA_BOOTSTRAP_SERVERS;
 import static com.linkedin.venice.writer.LeaderCompleteState.LEADER_COMPLETE_STATE_UNKNOWN;
 import static java.util.concurrent.TimeUnit.HOURS;
@@ -754,25 +755,19 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
   }
 
   /**
-   * Checks whether the lag is acceptable
+   * Checks whether the lag is acceptable for hybrid stores
    *
    * If the instance is a standby or DaVinciClient: Also check if
    * 1. leaderCompleteStatus header has been received and
    * 2. leader was completed and
    * 3. the last update time was within 5 seconds
    */
-  boolean isLagAcceptable(PartitionConsumptionState pcs, long offsetLag, long offsetThreshold) {
+  boolean isLagAcceptableForHybridStore(PartitionConsumptionState pcs, long offsetLag, long offsetThreshold) {
     boolean isLagAcceptable = (offsetLag <= offsetThreshold);
 
-    if (isDaVinciClient || pcs.getLeaderFollowerState().equals(LeaderFollowerStateType.STANDBY)) {
+    if (isDaVinciClient || pcs.getLeaderFollowerState().equals(STANDBY)) {
       if (!isLagAcceptable) {
         return false;
-      }
-
-      // lag is acceptable, now check if the leader is completed
-      if (!pcs.isHybrid()) {
-        // For non-hybrid stores, we don't need to check if the leader is completed or not
-        return true;
       }
 
       // For hybrid stores, we need to check if the first heart beat SOS has been received
@@ -850,17 +845,26 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
          */
         if (offsetThreshold >= 0) {
           long lag = measureHybridOffsetLag(partitionConsumptionState, shouldLogLag);
-          isLagAcceptable = isLagAcceptable(partitionConsumptionState, lag, offsetThreshold);
+          isLagAcceptable = isLagAcceptableForHybridStore(partitionConsumptionState, lag, offsetThreshold);
 
           if (shouldLogLag) {
+            String lagLogFooter;
+            if (isDaVinciClient || partitionConsumptionState.getLeaderFollowerState().equals(STANDBY)) {
+              lagLogFooter = ". Leader Complete State: {}, Last update In Ms: {}.".format(
+                  partitionConsumptionState.getLeaderCompleteState().toString(),
+                  partitionConsumptionState.getLastLeaderCompleteStateUpdateInMs());
+            } else {
+              lagLogFooter = "";
+            }
             LOGGER.info(
-                "{} [Offset lag] partition {} is {}lagging. Lag: [{}] {} Threshold [{}]",
+                "{} [Offset lag] partition {} is {}lagging. Lag: [{}] {} Threshold [{}]{}",
                 consumerTaskId,
                 partitionId,
                 (isLagAcceptable ? "not " : ""),
                 lag,
                 (isLagAcceptable ? "<" : ">"),
-                offsetThreshold);
+                offsetThreshold,
+                lagLogFooter);
           }
         }
 
@@ -880,17 +884,30 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
                 partitionConsumptionState);
           }
           long producerTimestampLag = LatencyUtils.getElapsedTimeInMs(latestConsumedProducerTimestamp);
-          boolean timestampLagIsAcceptable = (producerTimestampLag < producerTimeLagThresholdInMS);
+          boolean timestampLagIsAcceptable = isLagAcceptableForHybridStore(
+              partitionConsumptionState,
+              producerTimestampLag,
+              producerTimeLagThresholdInMS);
+
           if (shouldLogLag) {
+            String lagLogFooter;
+            if (isDaVinciClient || partitionConsumptionState.getLeaderFollowerState().equals(STANDBY)) {
+              lagLogFooter = ". Leader Complete State: {}, Last update In Ms: {}.".format(
+                  partitionConsumptionState.getLeaderCompleteState().toString(),
+                  partitionConsumptionState.getLastLeaderCompleteStateUpdateInMs());
+            } else {
+              lagLogFooter = "";
+            }
             LOGGER.info(
-                "{} [Time lag] partition {} is {}lagging. The latest producer timestamp is {}. Timestamp Lag: [{}] {} Threshold [{}]",
+                "{} [Time lag] partition {} is {}lagging. The latest producer timestamp is {}. Timestamp Lag: [{}] {} Threshold [{}]{}",
                 consumerTaskId,
                 partitionId,
                 (!timestampLagIsAcceptable ? "" : "not "),
                 latestConsumedProducerTimestamp,
                 producerTimestampLag,
                 (timestampLagIsAcceptable ? "<" : ">"),
-                producerTimeLagThresholdInMS);
+                producerTimeLagThresholdInMS,
+                lagLogFooter);
           }
           /**
            * If time lag is not acceptable but the producer timestamp of the last message of RT is smaller or equal than
@@ -924,7 +941,11 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
                 new PubSubTopicPartitionImpl(lagMeasurementTopic, partitionId);
             // Since DaVinci clients run in embedded mode, they may not have network ACLs to check remote RT to get
             // the latest producer timestamp in RT. Only use the latest producer time in local RT.
-            final String lagMeasurementKafkaUrl = isDaVinciClient ? localKafkaServer : realTimeTopicKafkaURL;
+            final String lagMeasurementKafkaUrl =
+                (isDaVinciClient || partitionConsumptionState.getLeaderFollowerState().equals(STANDBY))
+                    ? localKafkaServer
+                    : realTimeTopicKafkaURL;
+            // final String lagMeasurementKafkaUrl = isDaVinciClient ? localKafkaServer : realTimeTopicKafkaURL;
 
             if (!cachedPubSubMetadataGetter.containsTopic(getTopicManager(lagMeasurementKafkaUrl), realTimeTopic)) {
               timestampLagIsAcceptable = true;
@@ -971,12 +992,13 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
           }
         }
       } catch (Exception e) {
-        String exceptionMsgIdentifier =
+        /*        String exceptionMsgIdentifier =
             new StringBuilder().append(kafkaVersionTopic).append("_isReadyToServe").toString();
         if (!REDUNDANT_LOGGING_FILTER.isRedundantException(exceptionMsgIdentifier)) {
           LOGGER.info("Exception when trying to determine if hybrid store is ready to serve: {}", storeName, e);
-        }
+        }*/
         isLagAcceptable = false;
+        throw e;
       }
     }
 
