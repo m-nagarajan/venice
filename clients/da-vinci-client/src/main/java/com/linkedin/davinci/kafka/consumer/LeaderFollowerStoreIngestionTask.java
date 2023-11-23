@@ -2153,7 +2153,7 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
                     new LeaderMetadataWrapper(consumerRecord.getOffset(), kafkaClusterId);
                 PubSubTopicPartition topicPartition = new PubSubTopicPartitionImpl(getVersionTopic(), subPartition);
                 // Leaders forward HB SOS message from RT to local VT with updated LeaderCompleteState header:
-                // Adding the headers during this phase instead of adding it RT directly simplifies the logic
+                // Adding the headers during this phase instead of adding it to RT directly simplifies the logic
                 // of how to identify the HB SOS from the correct version or whether the HB SOS is from the local
                 // colo or remote colo, as the header inherited from an incorrect version or remote colos might
                 // provide incorrect information about the support of the header and the leader state.

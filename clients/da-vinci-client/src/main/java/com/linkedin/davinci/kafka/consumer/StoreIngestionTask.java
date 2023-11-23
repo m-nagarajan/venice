@@ -850,9 +850,9 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
           if (shouldLogLag) {
             String lagLogFooter;
             if (isDaVinciClient || partitionConsumptionState.getLeaderFollowerState().equals(STANDBY)) {
-              lagLogFooter = ". Leader Complete State: {}, Last update In Ms: {}.".format(
-                  partitionConsumptionState.getLeaderCompleteState().toString(),
-                  partitionConsumptionState.getLastLeaderCompleteStateUpdateInMs());
+              lagLogFooter = ". Leader Complete State: {"
+                  + partitionConsumptionState.getLeaderCompleteState().toString() + "}, Last update In Ms: {"
+                  + partitionConsumptionState.getLastLeaderCompleteStateUpdateInMs() + "}.";
             } else {
               lagLogFooter = "";
             }
@@ -892,9 +892,9 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
           if (shouldLogLag) {
             String lagLogFooter;
             if (isDaVinciClient || partitionConsumptionState.getLeaderFollowerState().equals(STANDBY)) {
-              lagLogFooter = ". Leader Complete State: {}, Last update In Ms: {}.".format(
-                  partitionConsumptionState.getLeaderCompleteState().toString(),
-                  partitionConsumptionState.getLastLeaderCompleteStateUpdateInMs());
+              lagLogFooter = ". Leader Complete State: {"
+                  + partitionConsumptionState.getLeaderCompleteState().toString() + "}, Last update In Ms: {"
+                  + partitionConsumptionState.getLastLeaderCompleteStateUpdateInMs() + "}.";
             } else {
               lagLogFooter = "";
             }
