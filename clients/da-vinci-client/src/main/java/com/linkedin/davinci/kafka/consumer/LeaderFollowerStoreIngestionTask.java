@@ -1906,7 +1906,6 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
       ControlMessageType controlMessageType = ControlMessageType.valueOf(controlMessage);
       if (controlMessageType == ControlMessageType.START_OF_SEGMENT
           && Arrays.equals(consumerRecord.getKey().getKey(), KafkaKey.HEART_BEAT.getKey())) {
-        partitionConsumptionState.setFirstHeartBeatSOSReceived(true);
         boolean isLeaderCompleteHeaderFound = false;
         LeaderCompleteState oldState = partitionConsumptionState.getLeaderCompleteState();
         LeaderCompleteState newState = oldState;
@@ -1942,6 +1941,9 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
               versionNumber,
               partitionConsumptionState.getPartition(),
               newState);
+        }
+        if (!partitionConsumptionState.isFirstHeartBeatSOSReceived()) {
+          partitionConsumptionState.setFirstHeartBeatSOSReceived(true);
         }
       }
     }
@@ -2151,20 +2153,24 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
                     beforeProcessingRecordTimestampNs);
                 LeaderMetadataWrapper leaderMetadataWrapper =
                     new LeaderMetadataWrapper(consumerRecord.getOffset(), kafkaClusterId);
-                PubSubTopicPartition topicPartition = new PubSubTopicPartitionImpl(getVersionTopic(), subPartition);
                 // Leaders forward HB SOS message from RT to local VT with updated LeaderCompleteState header:
                 // Adding the headers during this phase instead of adding it to RT directly simplifies the logic
                 // of how to identify the HB SOS from the correct version or whether the HB SOS is from the local
                 // colo or remote colo, as the header inherited from an incorrect version or remote colos might
                 // provide incorrect information about the support of the header and the leader state.
-                veniceWriter.get()
-                    .sendHeartbeat(
-                        topicPartition,
-                        callback,
-                        leaderMetadataWrapper,
-                        true,
-                        LeaderCompleteState.getLeaderCompleteState(partitionConsumptionState.isCompletionReported()),
-                        consumerRecord.getValue().producerMetadata.messageTimestamp); // original producers timestamp
+                List<Integer> subPartitions =
+                    PartitionUtils.getSubPartitions(partitionConsumptionState.getUserPartition(), amplificationFactor);
+                for (int _subPartition: subPartitions) {
+                  PubSubTopicPartition topicPartition = new PubSubTopicPartitionImpl(getVersionTopic(), _subPartition);
+                  veniceWriter.get()
+                      .sendHeartbeat(
+                          topicPartition,
+                          callback,
+                          leaderMetadataWrapper,
+                          true,
+                          LeaderCompleteState.getLeaderCompleteState(partitionConsumptionState.isCompletionReported()),
+                          consumerRecord.getValue().producerMetadata.messageTimestamp);// original producers timestamp
+                }
               } else {
                 /**
                  * Based on current design handling this case (specially EOS) is tricky as we don't produce the SOS/EOS
@@ -3279,14 +3285,14 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
    */
   void reportCompleted(PartitionConsumptionState partitionConsumptionState, boolean forceCompletion) {
     super.reportCompleted(partitionConsumptionState, forceCompletion);
-    if (partitionConsumptionState.getLeaderFollowerState().equals(LeaderFollowerStateType.LEADER)) {
-      veniceWriter.get()
-          .sendHeartbeat(
-              new PubSubTopicPartitionImpl(versionTopic, partitionConsumptionState.getPartition()),
-              null,
-              DEFAULT_LEADER_METADATA_WRAPPER,
-              true,
-              LEADER_COMPLETED);
+    if (partitionConsumptionState.getLeaderFollowerState().equals(LeaderFollowerStateType.LEADER)
+        || partitionConsumptionState.getLeaderFollowerState().equals(IN_TRANSITION_FROM_STANDBY_TO_LEADER)) {
+      List<Integer> subPartitions =
+          PartitionUtils.getSubPartitions(partitionConsumptionState.getUserPartition(), amplificationFactor);
+      for (int _subPartition: subPartitions) {
+        PubSubTopicPartition topicPartition = new PubSubTopicPartitionImpl(versionTopic, _subPartition);
+        veniceWriter.get().sendHeartbeat(topicPartition, null, DEFAULT_LEADER_METADATA_WRAPPER, true, LEADER_COMPLETED);
+      }
     }
   }
 }
