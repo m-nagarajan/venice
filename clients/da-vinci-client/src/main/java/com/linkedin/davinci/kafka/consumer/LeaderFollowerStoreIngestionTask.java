@@ -3289,7 +3289,9 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
    */
   void reportCompleted(PartitionConsumptionState partitionConsumptionState, boolean forceCompletion) {
     super.reportCompleted(partitionConsumptionState, forceCompletion);
-    if (partitionConsumptionState.getLeaderFollowerState().equals(LeaderFollowerStateType.LEADER)) {
+    if (partitionConsumptionState.getLeaderFollowerState().equals(LeaderFollowerStateType.LEADER)
+        || partitionConsumptionState.getLeaderFollowerState()
+            .equals(LeaderFollowerStateType.IN_TRANSITION_FROM_STANDBY_TO_LEADER)) {
       veniceWriter.get()
           .sendHeartbeat(
               new PubSubTopicPartitionImpl(versionTopic, partitionConsumptionState.getPartition()),
