@@ -5,6 +5,7 @@ import static com.linkedin.davinci.kafka.consumer.ConsumerActionType.SUBSCRIBE;
 import static com.linkedin.davinci.kafka.consumer.ConsumerActionType.UNSUBSCRIBE;
 import static com.linkedin.davinci.kafka.consumer.LeaderFollowerStateType.STANDBY;
 import static com.linkedin.venice.ConfigKeys.KAFKA_BOOTSTRAP_SERVERS;
+import static com.linkedin.venice.writer.LeaderCompleteState.LEADER_COMPLETE_STATE_UNKNOWN;
 import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -769,22 +770,20 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
         return false;
       }
 
-      return true;
-
       // For hybrid stores, we need to check if the first heart beat SOS has been received
       // to be able to decide whether the Leader supports sending LeaderCompleteState or not
-      /*if (!pcs.isFirstHeartBeatSOSReceived()) {
+      if (!pcs.isFirstHeartBeatSOSReceived()) {
         // if the first HB is not received, wait for the HB SOS to be received to be
         // able to know if the leader supports sending LeaderCompleteState or not
         return false;
       }
-      
+
       // if the first HB SOS is received, check if the leader supports sending LeaderCompleteState.
       // If so, check if the leader is completed and the last update time was within 5 seconds.
       // If not, standby don't have to wait further.
       return (pcs.getLeaderCompleteState().equals(LEADER_COMPLETE_STATE_UNKNOWN)
           || (pcs.isLeaderCompleted() && (System.currentTimeMillis()
-              - pcs.getLastLeaderCompleteStateUpdateInMs() < serverConfig.getIngestionHeartbeatIntervalMs())));*/
+              - pcs.getLastLeaderCompleteStateUpdateInMs() < serverConfig.getIngestionHeartbeatIntervalMs())));
     } else {
       return isLagAcceptable;
     }
@@ -946,7 +945,6 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
                 (isDaVinciClient || partitionConsumptionState.getLeaderFollowerState().equals(STANDBY))
                     ? localKafkaServer
                     : realTimeTopicKafkaURL;
-            // final String lagMeasurementKafkaUrl = isDaVinciClient ? localKafkaServer : realTimeTopicKafkaURL;
 
             if (!cachedPubSubMetadataGetter.containsTopic(getTopicManager(lagMeasurementKafkaUrl), realTimeTopic)) {
               timestampLagIsAcceptable = true;
