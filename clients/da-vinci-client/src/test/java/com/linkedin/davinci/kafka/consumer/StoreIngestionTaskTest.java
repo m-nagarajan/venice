@@ -26,6 +26,7 @@ import static com.linkedin.venice.utils.TestUtils.waitForNonDeterministicComplet
 import static com.linkedin.venice.utils.Time.MS_PER_DAY;
 import static com.linkedin.venice.utils.Time.MS_PER_HOUR;
 import static com.linkedin.venice.writer.LeaderCompleteState.LEADER_COMPLETED;
+import static com.linkedin.venice.writer.LeaderCompleteState.LEADER_COMPLETE_STATE_UNKNOWN;
 import static com.linkedin.venice.writer.LeaderCompleteState.LEADER_NOT_COMPLETED;
 import static com.linkedin.venice.writer.VeniceWriter.DEFAULT_LEADER_METADATA_WRAPPER;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -2837,7 +2838,8 @@ public abstract class StoreIngestionTaskTest {
     assertTrue(storeIngestionTaskUnderTest.isReadyToServe(mockPcsBufferReplayStartedLagCaughtUp));
 
     // case 6: Remote replication lag has not caught up but host has caught up to lag in local VT,
-    // so DaVinci replica will be marked ready to serve but not storage node replica
+    // leader won't be marked completed, but both DaVinci replica and storage node will be marked
+    // ready to serve if leader was completed
     PartitionConsumptionState mockPcsBufferReplayStartedRemoteLagging = mock(PartitionConsumptionState.class);
     doReturn(true).when(mockPcsBufferReplayStartedRemoteLagging).isEndOfPushReceived();
     doReturn(false).when(mockPcsBufferReplayStartedRemoteLagging).isComplete();
@@ -2866,9 +2868,8 @@ public abstract class StoreIngestionTaskTest {
         .getLastLeaderCompleteStateUpdateInMs();
     assertTrue(storeIngestionTaskUnderTest.isReadyToServe(mockPcsBufferReplayStartedRemoteLagging));
 
-    // case 7: If there are issues in replication from remote RT -> local VT, DaVinci client will still report ready
-    // to serve since they would have consumed all available data in local VT. But, storage nodes will not be ready
-    // to serve since they will detect lag with remote colo and wait for ingestion to catch up before serving data.
+    // case 7: If there are issues in replication from remote RT -> local VT, leader won't be marked completed,
+    // but both DaVinci replica and storage node will be marked ready to serve if leader was completed
     PartitionConsumptionState mockPcsOffsetLagCaughtUpTimestampLagging = mock(PartitionConsumptionState.class);
     doReturn(true).when(mockPcsOffsetLagCaughtUpTimestampLagging).isEndOfPushReceived();
     doReturn(false).when(mockPcsOffsetLagCaughtUpTimestampLagging).isComplete();
@@ -3013,6 +3014,115 @@ public abstract class StoreIngestionTaskTest {
     } else {
       assertTrue(storeIngestionTaskUnderTest.isReadyToServe(mockPcsMultipleSourceKafkaServers));
     }
+  }
+
+  @Test(dataProvider = "True-and-False", dataProviderClass = DataProviderUtils.class)
+  public void testIsLagAcceptableForHybridStore(boolean isDaVinciClient) {
+    StoreIngestionTask mockStoreIngestionTask = mock(StoreIngestionTask.class);
+    PartitionConsumptionState mockPartitionConsumptionState = mock(PartitionConsumptionState.class);
+    doCallRealMethod().when(mockPartitionConsumptionState).isLeaderCompleted();
+
+    // Case 1: offsetLag > offsetThreshold and instance is leader
+    long offsetLag = 100;
+    long offsetThreshold = 50;
+    if (!isDaVinciClient) {
+      doReturn(LEADER).when(mockPartitionConsumptionState).getLeaderFollowerState();
+      assertFalse(
+          mockStoreIngestionTask.isLagAcceptableForHybridStore(
+              mockPartitionConsumptionState,
+              offsetLag,
+              offsetThreshold,
+              isDaVinciClient,
+              0));
+    }
+
+    // case 2: offsetLag > offsetThreshold and instance is not a leader
+    doReturn(STANDBY).when(mockPartitionConsumptionState).getLeaderFollowerState();
+    assertFalse(
+        mockStoreIngestionTask.isLagAcceptableForHybridStore(
+            mockPartitionConsumptionState,
+            offsetLag,
+            offsetThreshold,
+            isDaVinciClient,
+            0));
+
+    // Case 3: offsetLag <= offsetThreshold and instance is not a standby or DaVinciClient
+    offsetLag = 50;
+    offsetThreshold = 100;
+    if (!isDaVinciClient) {
+      doReturn(LEADER).when(mockPartitionConsumptionState).getLeaderFollowerState();
+      assertTrue(
+          mockStoreIngestionTask.isLagAcceptableForHybridStore(
+              mockPartitionConsumptionState,
+              offsetLag,
+              offsetThreshold,
+              isDaVinciClient,
+              0));
+    }
+
+    // Case 4: offsetLag <= offsetThreshold and instance is a standby or DaVinciClient
+    // and first heart beat SOS has not been received
+    doReturn(STANDBY).when(mockPartitionConsumptionState).getLeaderFollowerState();
+    doReturn(false).when(mockPartitionConsumptionState).isFirstHeartBeatSOSReceived();
+    assertFalse(
+        mockStoreIngestionTask.isLagAcceptableForHybridStore(
+            mockPartitionConsumptionState,
+            offsetLag,
+            offsetThreshold,
+            isDaVinciClient,
+            0));
+
+    // Case 5: offsetLag <= offsetThreshold and instance is a standby or DaVinciClient
+    // and first heart beat SOS has been received and leaderCompleteState is unknown
+    doReturn(true).when(mockPartitionConsumptionState).isFirstHeartBeatSOSReceived();
+    doReturn(LEADER_COMPLETE_STATE_UNKNOWN).when(mockPartitionConsumptionState).getLeaderCompleteState();
+    assertTrue(
+        mockStoreIngestionTask.isLagAcceptableForHybridStore(
+            mockPartitionConsumptionState,
+            offsetLag,
+            offsetThreshold,
+            isDaVinciClient,
+            0));
+
+    // Case 6: offsetLag <= offsetThreshold and instance is a standby or DaVinciClient
+    // and first heart beat SOS has been received and leaderCompleteState is LEADER_COMPLETED
+    // and last update time is within threshold
+    doReturn(STANDBY).when(mockPartitionConsumptionState).getLeaderFollowerState();
+    doReturn(LEADER_COMPLETED).when(mockPartitionConsumptionState).getLeaderCompleteState();
+    doReturn(System.currentTimeMillis() - 1000).when(mockPartitionConsumptionState)
+        .getLastLeaderCompleteStateUpdateInMs();
+    assertTrue(
+        mockStoreIngestionTask.isLagAcceptableForHybridStore(
+            mockPartitionConsumptionState,
+            offsetLag,
+            offsetThreshold,
+            isDaVinciClient,
+            5000L));
+
+    // Case 7: offsetLag <= offsetThreshold and instance is a standby or DaVinciClient
+    // and first heart beat SOS has been received and leaderCompleteState is LEADER_COMPLETED
+    // and last update time is more than threshold
+    doReturn(System.currentTimeMillis() - 6000).when(mockPartitionConsumptionState)
+        .getLastLeaderCompleteStateUpdateInMs();
+    assertFalse(
+        mockStoreIngestionTask.isLagAcceptableForHybridStore(
+            mockPartitionConsumptionState,
+            offsetLag,
+            offsetThreshold,
+            isDaVinciClient,
+            5000L));
+
+    // Case 7: offsetLag <= offsetThreshold and instance is a standby or DaVinciClient
+    // and first heart beat SOS has been received and leaderCompleteState is LEADER_NOT_COMPLETED
+    // and leader is not completed
+    doReturn(LEADER_NOT_COMPLETED).when(mockPartitionConsumptionState).getLeaderCompleteState();
+    assertFalse(
+        mockStoreIngestionTask.isLagAcceptableForHybridStore(
+            mockPartitionConsumptionState,
+            offsetLag,
+            offsetThreshold,
+            isDaVinciClient,
+            5000L));
   }
 
   @Test(dataProvider = "True-and-False", dataProviderClass = DataProviderUtils.class)

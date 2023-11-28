@@ -3295,7 +3295,8 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
    */
   void reportCompleted(PartitionConsumptionState partitionConsumptionState, boolean forceCompletion) {
     super.reportCompleted(partitionConsumptionState, forceCompletion);
-    if (partitionConsumptionState.getLeaderFollowerState().equals(LeaderFollowerStateType.LEADER)) {
+    if (partitionConsumptionState.getLeaderFollowerState().equals(LeaderFollowerStateType.LEADER)
+        || partitionConsumptionState.getLeaderFollowerState().equals(IN_TRANSITION_FROM_STANDBY_TO_LEADER)) {
       List<Integer> subPartitions =
           PartitionUtils.getSubPartitions(partitionConsumptionState.getUserPartition(), amplificationFactor);
       for (int _subPartition: subPartitions) {

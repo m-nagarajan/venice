@@ -762,7 +762,12 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
    * 2. leader was completed and
    * 3. the last update time was within 5 seconds
    */
-  boolean isLagAcceptableForHybridStore(PartitionConsumptionState pcs, long offsetLag, long offsetThreshold) {
+  protected static boolean isLagAcceptableForHybridStore(
+      PartitionConsumptionState pcs,
+      long offsetLag,
+      long offsetThreshold,
+      boolean isDaVinciClient,
+      long ingestionHeartbeatIntervalMs) {
     boolean isLagAcceptable = (offsetLag <= offsetThreshold);
 
     if (isDaVinciClient || pcs.getLeaderFollowerState().equals(STANDBY)) {
@@ -781,9 +786,8 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
       // if the first HB SOS is received, check if the leader supports sending LeaderCompleteState.
       // If so, check if the leader is completed and the last update time was within 5 seconds.
       // If not, standby don't have to wait further.
-      return (pcs.getLeaderCompleteState().equals(LEADER_COMPLETE_STATE_UNKNOWN)
-          || (pcs.isLeaderCompleted() && (System.currentTimeMillis()
-              - pcs.getLastLeaderCompleteStateUpdateInMs() < serverConfig.getIngestionHeartbeatIntervalMs())));
+      return (pcs.getLeaderCompleteState().equals(LEADER_COMPLETE_STATE_UNKNOWN) || (pcs.isLeaderCompleted()
+          && (System.currentTimeMillis() - pcs.getLastLeaderCompleteStateUpdateInMs() < ingestionHeartbeatIntervalMs)));
     } else {
       return isLagAcceptable;
     }
@@ -845,7 +849,12 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
          */
         if (offsetThreshold >= 0) {
           long lag = measureHybridOffsetLag(partitionConsumptionState, shouldLogLag);
-          isLagAcceptable = isLagAcceptableForHybridStore(partitionConsumptionState, lag, offsetThreshold);
+          isLagAcceptable = isLagAcceptableForHybridStore(
+              partitionConsumptionState,
+              lag,
+              offsetThreshold,
+              isDaVinciClient,
+              serverConfig.getIngestionHeartbeatIntervalMs());
 
           if (shouldLogLag) {
             String lagLogFooter;
@@ -887,7 +896,9 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
           boolean timestampLagIsAcceptable = isLagAcceptableForHybridStore(
               partitionConsumptionState,
               producerTimestampLag,
-              producerTimeLagThresholdInMS);
+              producerTimeLagThresholdInMS,
+              isDaVinciClient,
+              serverConfig.getIngestionHeartbeatIntervalMs());
 
           if (shouldLogLag) {
             String lagLogFooter;
