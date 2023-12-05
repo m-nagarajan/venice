@@ -931,12 +931,8 @@ public abstract class StoreIngestionTask implements Runnable, Closeable {
           }
         }
       } catch (Exception e) {
-        String exceptionMsgIdentifier =
-            new StringBuilder().append(kafkaVersionTopic).append("_isReadyToServe").toString();
-        if (!REDUNDANT_LOGGING_FILTER.isRedundantException(exceptionMsgIdentifier)) {
-          LOGGER.info("Exception when trying to determine if hybrid store is ready to serve: {}", storeName, e);
-        }
-        isLagAcceptable = false;
+        LOGGER.info("Exception when trying to determine if hybrid store is ready to serve: {}", storeName, e);
+        throw e;
       }
     }
 
