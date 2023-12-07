@@ -85,6 +85,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
@@ -170,7 +171,7 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
 
   protected final AvroStoreDeserializerCache storeDeserializerCache;
 
-  private long lastSendIngestionHeartbeatTimestamp;
+  private final AtomicLong lastSendIngestionHeartbeatTimestamp = new AtomicLong(0);
 
   public LeaderFollowerStoreIngestionTask(
       StoreIngestionTaskFactory.Builder builder,
@@ -3185,7 +3186,7 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
       return;
     }
     long currentTimestamp = System.currentTimeMillis();
-    if (lastSendIngestionHeartbeatTimestamp + serverConfig.getIngestionHeartbeatIntervalMs() > currentTimestamp) {
+    if (lastSendIngestionHeartbeatTimestamp.get() + serverConfig.getIngestionHeartbeatIntervalMs() > currentTimestamp) {
       // Not time for another heartbeat yet.
       return;
     }
@@ -3211,23 +3212,21 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
         }
       }
     }
-    lastSendIngestionHeartbeatTimestamp = currentTimestamp;
+    lastSendIngestionHeartbeatTimestamp.set(currentTimestamp);
   }
 
   /**
-   * Once leader is marked completed, immediately send a heart beat message to the local VT such that
-   * followers don't have to wait till the periodic heartbeat to know that the leader is completed
+   * Once leader is marked completed, immediately reset {@link #lastSendIngestionHeartbeatTimestamp}
+   * such that {@link #maybeSendIngestionHeartbeat()} will send HB SOS to the respective RT topics
+   * rather than waiting for the timer to send HB SOS. Since this is the drainer thread, producer
+   * should not write to VT directly from here which will lead to deadlock between producer and drainer.
    */
+  @Override
   void reportCompleted(PartitionConsumptionState partitionConsumptionState, boolean forceCompletion) {
     super.reportCompleted(partitionConsumptionState, forceCompletion);
-    if (partitionConsumptionState.getLeaderFollowerState().equals(LeaderFollowerStateType.LEADER)) {
-      veniceWriter.get()
-          .sendHeartbeat(
-              new PubSubTopicPartitionImpl(versionTopic, partitionConsumptionState.getPartition()),
-              null,
-              DEFAULT_LEADER_METADATA_WRAPPER,
-              true,
-              LeaderCompleteState.LEADER_COMPLETED);
+    if (isHybridMode() && partitionConsumptionState.getLeaderFollowerState().equals(LEADER)) {
+      // reset lastSendIngestionHeartbeatTimestamp to force sending HB SOS to the respective RT topics.
+      lastSendIngestionHeartbeatTimestamp.set(0);
     }
   }
 }
