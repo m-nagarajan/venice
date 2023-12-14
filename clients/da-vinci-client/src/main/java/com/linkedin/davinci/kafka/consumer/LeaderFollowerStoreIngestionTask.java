@@ -1910,9 +1910,12 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
   /**
    * Checks whether the lag is acceptable for hybrid stores
    * <p>
-   * leaderCompleteStateCheckEnabled is not used for non AA stores: as consumer task is unable to read HB messages from
-   * RT topic (though a test consumer can still read it), leading to standby replicas waiting for leader completion
-   * state header indefinitely, so disabling it until that issue is resolved
+   * If the instance is a standby or DaVinciClient: Also check if <br>
+   * 1. the feature is enabled <br>
+   * 2. first HB SOS is received and <br>
+   * 3. leaderCompleteStatus header has been received and <br>
+   * 4. leader was completed and <br>
+   * 5. the last update time was within the configured time interval
    */
   @Override
   protected boolean checkAndLogIfLagIsAcceptableForHybridStore(
@@ -1924,9 +1927,33 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
       long latestConsumedProducerTimestamp) {
     boolean isLagAcceptable = offsetLag <= offsetThreshold;
 
+    if (isLagAcceptable && isHybridFollower(pcs)) {
+      if (!getServerConfig().isLeaderCompleteStateCheckInFollowerEnabled()) {
+        isLagAcceptable = true;
+      } else if (!pcs.isFirstHeartBeatSOSReceived()) {
+        // wait for the first HB to know if the leader supports sending LeaderCompleteState or not
+        isLagAcceptable = false;
+      } else if (pcs.getLeaderCompleteState().equals(LEADER_COMPLETE_STATE_UNKNOWN)) {
+        // if the leader don't support LeaderCompleteState
+        isLagAcceptable = true;
+      } else {
+        // check if the leader is completed and the last update time was within the configured time
+        isLagAcceptable = pcs.isLeaderCompleted()
+            && ((System.currentTimeMillis() - pcs.getLastLeaderCompleteStateUpdateInMs()) <= getServerConfig()
+                .getLeaderCompleteStateCheckInFollowerValidIntervalMs());
+      }
+    }
+
     if (shouldLogLag) {
+      String lagLogFooter;
+      if (isHybridFollower(pcs)) {
+        lagLogFooter = ". Leader Complete State: {" + pcs.getLeaderCompleteState().toString()
+            + "}, Last update In Ms: {" + pcs.getLastLeaderCompleteStateUpdateInMs() + "}.";
+      } else {
+        lagLogFooter = "";
+      }
       LOGGER.info(
-          "{} [{} lag] partition {} is {}lagging. {}Lag: [{}] {} Threshold [{}]",
+          "{} [{} lag] partition {} is {}lagging. {}Lag: [{}] {} Threshold [{}]{}",
           isOffsetBasedLag ? "Offset" : "Time",
           consumerTaskId,
           pcs.getPartition(),
@@ -1934,7 +1961,8 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
           (isOffsetBasedLag ? "" : "The latest producer timestamp is " + latestConsumedProducerTimestamp + ". "),
           offsetLag,
           (isLagAcceptable ? "<" : ">"),
-          offsetThreshold);
+          offsetThreshold,
+          lagLogFooter);
     }
 
     return isLagAcceptable;

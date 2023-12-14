@@ -3,7 +3,6 @@ package com.linkedin.davinci.kafka.consumer;
 import static com.linkedin.davinci.kafka.consumer.LeaderFollowerStateType.LEADER;
 import static com.linkedin.davinci.kafka.consumer.LeaderFollowerStateType.STANDBY;
 import static com.linkedin.venice.VeniceConstants.REWIND_TIME_DECIDED_BY_SERVER;
-import static com.linkedin.venice.writer.LeaderCompleteState.LEADER_COMPLETE_STATE_UNKNOWN;
 import static com.linkedin.venice.writer.VeniceWriter.APP_DEFAULT_LOGICAL_TS;
 
 import com.linkedin.avroutil1.compatibility.AvroCompatibilityHelper;
@@ -1278,7 +1277,7 @@ public class ActiveActiveStoreIngestionTask extends LeaderFollowerStoreIngestion
    * 4. leader was completed and <br>
    * 5. the last update time was within the configured time interval
    */
-  @Override
+  /*  @Override
   protected boolean checkAndLogIfLagIsAcceptableForHybridStore(
       PartitionConsumptionState pcs,
       long offsetLag,
@@ -1287,7 +1286,7 @@ public class ActiveActiveStoreIngestionTask extends LeaderFollowerStoreIngestion
       boolean isOffsetBasedLag,
       long latestConsumedProducerTimestamp) {
     boolean isLagAcceptable = offsetLag <= offsetThreshold;
-
+  
     if (isLagAcceptable && isHybridFollower(pcs)) {
       if (!getServerConfig().isLeaderCompleteStateCheckInFollowerEnabled()) {
         isLagAcceptable = true;
@@ -1304,7 +1303,7 @@ public class ActiveActiveStoreIngestionTask extends LeaderFollowerStoreIngestion
                 .getLeaderCompleteStateCheckInFollowerValidIntervalMs());
       }
     }
-
+  
     if (shouldLogLag) {
       String lagLogFooter;
       if (isHybridFollower(pcs)) {
@@ -1325,9 +1324,9 @@ public class ActiveActiveStoreIngestionTask extends LeaderFollowerStoreIngestion
           offsetThreshold,
           lagLogFooter);
     }
-
+  
     return isLagAcceptable;
-  }
+  }*/
 
   @Override
   public long getRegionHybridOffsetLag(int regionId) {
