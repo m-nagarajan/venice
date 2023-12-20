@@ -3328,6 +3328,28 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
     partitionConsumptionStateMap.put(partition, pcs);
   }
 
+  private void logIngestionHeartbeat(PubSubTopicPartition topicPartition, Exception exception) {
+    String topicPartitionName = topicPartition.getPubSubTopic().getName();
+    int partitionId = topicPartition.getPartitionNumber();
+
+    if (exception != null) {
+      if (!REDUNDANT_LOGGING_FILTER.isRedundantException("Failed to send ingestion heartbeat")) {
+        LOGGER.error(
+            "Failed to send ingestion heartbeat for topic: {}, partition: {}",
+            topicPartitionName,
+            partitionId,
+            exception);
+      }
+    } else {
+      if (!REDUNDANT_LOGGING_FILTER.isRedundantException("Ingestion heartbeat successfully sent")) {
+        LOGGER.info(
+            "Ingestion heartbeat successfully sent for topic: {}, partition: {}",
+            topicPartitionName,
+            partitionId);
+      }
+    }
+  }
+
   private void sendIngestionHeartbeat(
       PubSubTopicPartition topicPartition,
       PubSubProducerCallback callback,
@@ -3348,8 +3370,6 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
       boolean addLeaderCompleteState,
       LeaderCompleteState leaderCompleteState,
       long originTimeStampMs) {
-    String topicPartitionName = topicPartition.getPubSubTopic().getName();
-    int partitionId = topicPartition.getPartitionNumber();
     try {
       veniceWriter.get()
           .sendHeartbeat(
@@ -3359,31 +3379,9 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
               addLeaderCompleteState,
               leaderCompleteState,
               originTimeStampMs)
-          .whenComplete((result, throwable) -> {
-            if (throwable != null) {
-              String errorMessage = String.format(
-                  "Failed to send ingestion heartbeat for topic: %s, partition: %s",
-                  topicPartitionName,
-                  partitionId);
-              if (!REDUNDANT_LOGGING_FILTER.isRedundantException(errorMessage)) {
-                LOGGER.error(errorMessage, throwable);
-              }
-            } else {
-              String message = String.format(
-                  "Ingestion heartbeat successfully sent for topic: %s, partition: %s",
-                  topicPartitionName,
-                  partitionId);
-              if (!REDUNDANT_LOGGING_FILTER.isRedundantException(message)) {
-                LOGGER.info(message);
-              }
-            }
-          });
+          .whenComplete((ignore, throwable) -> logIngestionHeartbeat(topicPartition, (Exception) throwable));
     } catch (Exception e) {
-      String errorMessage = String
-          .format("Failed to send ingestion heartbeat for topic: %s, partition: %s", topicPartitionName, partitionId);
-      if (!REDUNDANT_LOGGING_FILTER.isRedundantException(errorMessage)) {
-        LOGGER.error(errorMessage, e);
-      }
+      logIngestionHeartbeat(topicPartition, e);
     }
   }
 
