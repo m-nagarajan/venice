@@ -3333,19 +3333,17 @@ public class LeaderFollowerStoreIngestionTask extends StoreIngestionTask {
     int partitionId = topicPartition.getPartitionNumber();
 
     if (exception != null) {
-      if (!REDUNDANT_LOGGING_FILTER.isRedundantException("Failed to send ingestion heartbeat")) {
-        LOGGER.error(
-            "Failed to send ingestion heartbeat for topic: {}, partition: {}",
-            topicPartitionName,
-            partitionId,
-            exception);
+      // log every failure once
+      String errorMessage = String
+          .format("Failed to send ingestion heartbeat for topic: %s, partition: %s", topicPartitionName, partitionId);
+      if (!REDUNDANT_LOGGING_FILTER.isRedundantException(errorMessage)) {
+        LOGGER.error(errorMessage, exception);
       }
     } else {
-      if (!REDUNDANT_LOGGING_FILTER.isRedundantException("Ingestion heartbeat successfully sent")) {
-        LOGGER.info(
-            "Ingestion heartbeat successfully sent for topic: {}, partition: {}",
-            topicPartitionName,
-            partitionId);
+      // log one success per topic once
+      String message = String.format("Successfully sent ingestion heartbeat for topic: %s", topicPartitionName);
+      if (!REDUNDANT_LOGGING_FILTER.isRedundantException(message)) {
+        LOGGER.info("{}, partition: {}", message, partitionId);
       }
     }
   }
