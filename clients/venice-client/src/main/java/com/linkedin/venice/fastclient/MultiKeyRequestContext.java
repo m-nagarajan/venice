@@ -95,10 +95,10 @@ public abstract class MultiKeyRequestContext<K, V> extends RequestContext {
       recordDeserializationTimeNS += rrc.recordDeserializationTime.get();
       requestSerializationTimeNS += rrc.requestSerializationTime.get();
     }
-    decompressionTime = LatencyUtils.convertLatencyFromNSToMS(decompressionTimeNS);
+    decompressionTime = LatencyUtils.getLatencyInMS(decompressionTimeNS);
     responseDeserializationTime =
-        LatencyUtils.convertLatencyFromNSToMS(responseDeserializationTimeNS + recordDeserializationTimeNS);
-    requestSerializationTime = LatencyUtils.convertLatencyFromNSToMS(requestSerializationTimeNS);
+        LatencyUtils.getLatencyInMS(responseDeserializationTimeNS + recordDeserializationTimeNS);
+    requestSerializationTime = LatencyUtils.getLatencyInMS(requestSerializationTimeNS);
 
     if (firstRequestSentTS.get() != -1 && firstResponseReceivedTS.get() != -1) {
       requestSubmissionToResponseHandlingTime = firstResponseReceivedTS.get() - firstRequestSentTS.get();
