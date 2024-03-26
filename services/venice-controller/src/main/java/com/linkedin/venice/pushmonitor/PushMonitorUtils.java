@@ -90,7 +90,7 @@ public class PushMonitorUtils {
           break;
         }
       }
-      if (allInstancesCompleted) {
+      if (allInstancesCompleted && totalReplicaCount > 0) {
         completedPartitions++;
       } else {
         incompletePartition.add(partitionId);
