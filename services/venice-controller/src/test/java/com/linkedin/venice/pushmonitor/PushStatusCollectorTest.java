@@ -33,6 +33,8 @@ public class PushStatusCollectorTest {
     String daVinciStoreTopicV3 = "daVinciStore_v3";
     String daVinciStoreTopicV4 = "daVinciStore_v4";
     String daVinciStoreTopicV5 = "daVinciStore_v5";
+    String daVinciStoreTopicV6 = "daVinciStore_v6";
+    String daVinciStoreTopicV7 = "daVinciStore_v7";
     Store daVinciStore = mock(Store.class);
     when(daVinciStore.isDaVinciPushStatusStoreEnabled()).thenReturn(true);
     when(storeRepository.getStore(daVinciStoreName)).thenReturn(daVinciStore);
@@ -74,18 +76,28 @@ public class PushStatusCollectorTest {
 
     pushCompletedCount.set(0);
     pushErrorCount.set(0);
-    Map<CharSequence, Integer> successfulInstancePushStatus = Collections.singletonMap("instance", 10);
-    Map<CharSequence, Integer> errorInstancePushStatus = Collections.singletonMap("instance", 12);
-    Map<CharSequence, Integer> startedInstancePushStatus = Collections.singletonMap("instance", 2);
+    // DVC status
+    Map<CharSequence, Integer> startedInstancePushStatus =
+        Collections.singletonMap("instance", ExecutionStatus.STARTED.getValue());
+    Map<CharSequence, Integer> successfulInstancePushStatus =
+        Collections.singletonMap("instance", ExecutionStatus.COMPLETED.getValue());
+    Map<CharSequence, Integer> diskErrorInstancePushStatus =
+        Collections.singletonMap("instance", ExecutionStatus.DVC_INGESTION_ERROR_DISK_FULL.getValue());
+    Map<CharSequence, Integer> otherErrorInstancePushStatus =
+        Collections.singletonMap("instance", ExecutionStatus.DVC_INGESTION_ERROR_OTHER.getValue());
 
     when(pushStatusStoreReader.getPartitionStatus(daVinciStoreName, 2, 0, Optional.empty()))
         .thenReturn(startedInstancePushStatus, successfulInstancePushStatus);
     when(pushStatusStoreReader.getPartitionStatus(daVinciStoreName, 3, 0, Optional.empty()))
         .thenReturn(startedInstancePushStatus, successfulInstancePushStatus);
     when(pushStatusStoreReader.getPartitionStatus(daVinciStoreName, 4, 0, Optional.empty()))
-        .thenReturn(startedInstancePushStatus, errorInstancePushStatus);
+        .thenReturn(startedInstancePushStatus, diskErrorInstancePushStatus);
     when(pushStatusStoreReader.getPartitionStatus(daVinciStoreName, 5, 0, Optional.empty()))
-        .thenReturn(startedInstancePushStatus, errorInstancePushStatus);
+        .thenReturn(startedInstancePushStatus, otherErrorInstancePushStatus);
+    when(pushStatusStoreReader.getPartitionStatus(daVinciStoreName, 6, 0, Optional.empty()))
+        .thenReturn(startedInstancePushStatus, diskErrorInstancePushStatus);
+    when(pushStatusStoreReader.getPartitionStatus(daVinciStoreName, 7, 0, Optional.empty()))
+        .thenReturn(startedInstancePushStatus, otherErrorInstancePushStatus);
     when(pushStatusStoreReader.isInstanceAlive(daVinciStoreName, "instance")).thenReturn(true);
     pushStatusCollector.subscribeTopic(daVinciStoreTopicV1, 1);
     Assert.assertFalse(pushStatusCollector.getTopicToPushStatusMap().containsKey(daVinciStoreTopicV1));
@@ -126,7 +138,7 @@ public class PushStatusCollectorTest {
         true,
         () -> Assert.assertEquals(pushErrorCount.get(), 1));
 
-    // Da Vinci Topic v4, DVC ERROR, Server success
+    // Da Vinci Topic v4, DVC Disk ERROR, Server success
     pushCompletedCount.set(0);
     pushErrorCount.set(0);
     pushStatusCollector.subscribeTopic(daVinciStoreTopicV4, 1);
@@ -144,18 +156,54 @@ public class PushStatusCollectorTest {
         true,
         () -> Assert.assertEquals(pushErrorCount.get(), 1));
 
-    // Da Vinci Topic v5, DVC ERROR, Server ERROR
+    // Da Vinci Topic v5, DVC Other ERROR, Server success
     pushCompletedCount.set(0);
     pushErrorCount.set(0);
     pushStatusCollector.subscribeTopic(daVinciStoreTopicV5, 1);
-    Assert.assertTrue(pushStatusCollector.getTopicToPushStatusMap().containsKey(daVinciStoreTopicV5));
+    Assert.assertTrue(pushStatusCollector.getTopicToPushStatusMap().containsKey(daVinciStoreTopicV4));
     TestUtils.waitForNonDeterministicAssertion(
         2,
         TimeUnit.SECONDS,
         true,
         () -> verify(pushStatusStoreReader, atLeast(1)).getPartitionStatus(daVinciStoreName, 5, 0, Optional.empty()));
     Assert.assertEquals(pushErrorCount.get(), 0);
-    pushStatusCollector.handleServerPushStatusUpdate(daVinciStoreTopicV5, ExecutionStatus.ERROR, null);
+    pushStatusCollector.handleServerPushStatusUpdate(daVinciStoreTopicV5, ExecutionStatus.COMPLETED, null);
+    TestUtils.waitForNonDeterministicAssertion(
+        2,
+        TimeUnit.SECONDS,
+        true,
+        () -> Assert.assertEquals(pushErrorCount.get(), 1));
+
+    // Da Vinci Topic v6, DVC Disk ERROR, Server ERROR
+    pushCompletedCount.set(0);
+    pushErrorCount.set(0);
+    pushStatusCollector.subscribeTopic(daVinciStoreTopicV6, 1);
+    Assert.assertTrue(pushStatusCollector.getTopicToPushStatusMap().containsKey(daVinciStoreTopicV6));
+    TestUtils.waitForNonDeterministicAssertion(
+        2,
+        TimeUnit.SECONDS,
+        true,
+        () -> verify(pushStatusStoreReader, atLeast(1)).getPartitionStatus(daVinciStoreName, 6, 0, Optional.empty()));
+    Assert.assertEquals(pushErrorCount.get(), 0);
+    pushStatusCollector.handleServerPushStatusUpdate(daVinciStoreTopicV6, ExecutionStatus.ERROR, null);
+    TestUtils.waitForNonDeterministicAssertion(
+        2,
+        TimeUnit.SECONDS,
+        true,
+        () -> Assert.assertEquals(pushErrorCount.get(), 1));
+
+    // Da Vinci Topic v7, DVC Other ERROR, Server ERROR
+    pushCompletedCount.set(0);
+    pushErrorCount.set(0);
+    pushStatusCollector.subscribeTopic(daVinciStoreTopicV7, 1);
+    Assert.assertTrue(pushStatusCollector.getTopicToPushStatusMap().containsKey(daVinciStoreTopicV7));
+    TestUtils.waitForNonDeterministicAssertion(
+        2,
+        TimeUnit.SECONDS,
+        true,
+        () -> verify(pushStatusStoreReader, atLeast(1)).getPartitionStatus(daVinciStoreName, 7, 0, Optional.empty()));
+    Assert.assertEquals(pushErrorCount.get(), 0);
+    pushStatusCollector.handleServerPushStatusUpdate(daVinciStoreTopicV7, ExecutionStatus.ERROR, null);
     TestUtils.waitForNonDeterministicAssertion(
         2,
         TimeUnit.SECONDS,
@@ -172,6 +220,7 @@ public class PushStatusCollectorTest {
     String daVinciStoreTopicV1 = "daVinciStore_v1";
     String daVinciStoreTopicV2 = "daVinciStore_v2";
     String daVinciStoreTopicV3 = "daVinciStore_v3";
+    String daVinciStoreTopicV4 = "daVinciStore_v4";
 
     Store daVinciStore = mock(Store.class);
     when(daVinciStore.isDaVinciPushStatusStoreEnabled()).thenReturn(true);
@@ -197,14 +246,22 @@ public class PushStatusCollectorTest {
 
     pushCompletedCount.set(0);
     pushErrorCount.set(0);
-    Map<CharSequence, Integer> successfulInstancePushStatus = Collections.singletonMap("instance", 10);
-    Map<CharSequence, Integer> errorInstancePushStatus = Collections.singletonMap("instance", 12);
-    Map<CharSequence, Integer> startedInstancePushStatus = Collections.singletonMap("instance", 2);
+    // DVC status
+    Map<CharSequence, Integer> startedInstancePushStatus =
+        Collections.singletonMap("instance", ExecutionStatus.STARTED.getValue());
+    Map<CharSequence, Integer> successfulInstancePushStatus =
+        Collections.singletonMap("instance", ExecutionStatus.COMPLETED.getValue());
+    Map<CharSequence, Integer> diskErrorInstancePushStatus =
+        Collections.singletonMap("instance", ExecutionStatus.DVC_INGESTION_ERROR_DISK_FULL.getValue());
+    Map<CharSequence, Integer> otherErrorInstancePushStatus =
+        Collections.singletonMap("instance", ExecutionStatus.DVC_INGESTION_ERROR_OTHER.getValue());
 
     when(pushStatusStoreReader.getPartitionStatus(daVinciStoreName, 2, 0, Optional.empty()))
         .thenReturn(Collections.emptyMap(), startedInstancePushStatus, successfulInstancePushStatus);
     when(pushStatusStoreReader.getPartitionStatus(daVinciStoreName, 3, 0, Optional.empty()))
-        .thenReturn(Collections.emptyMap(), startedInstancePushStatus, errorInstancePushStatus);
+        .thenReturn(Collections.emptyMap(), startedInstancePushStatus, diskErrorInstancePushStatus);
+    when(pushStatusStoreReader.getPartitionStatus(daVinciStoreName, 4, 0, Optional.empty()))
+        .thenReturn(Collections.emptyMap(), startedInstancePushStatus, otherErrorInstancePushStatus);
     when(pushStatusStoreReader.isInstanceAlive(daVinciStoreName, "instance")).thenReturn(true);
     pushStatusCollector.subscribeTopic(daVinciStoreTopicV1, 1);
     Assert.assertFalse(pushStatusCollector.getTopicToPushStatusMap().containsKey(daVinciStoreTopicV1));
@@ -227,7 +284,7 @@ public class PushStatusCollectorTest {
         false,
         () -> Assert.assertEquals(pushCompletedCount.get(), 1));
 
-    // Da Vinci Topic v3, DVC ERROR, Server COMPLETED
+    // Da Vinci Topic v3, DVC Disk ERROR, Server COMPLETED
     pushCompletedCount.set(0);
     pushErrorCount.set(0);
     pushStatusCollector.subscribeTopic(daVinciStoreTopicV3, 1);
@@ -239,6 +296,24 @@ public class PushStatusCollectorTest {
         () -> verify(pushStatusStoreReader, times(3)).getPartitionStatus(daVinciStoreName, 3, 0, Optional.empty()));
     Assert.assertEquals(pushErrorCount.get(), 0);
     pushStatusCollector.handleServerPushStatusUpdate(daVinciStoreTopicV3, ExecutionStatus.COMPLETED, null);
+    TestUtils.waitForNonDeterministicAssertion(
+        2,
+        TimeUnit.SECONDS,
+        false,
+        () -> Assert.assertEquals(pushErrorCount.get(), 1));
+
+    // Da Vinci Topic v4, DVC Other ERROR, Server COMPLETED
+    pushCompletedCount.set(0);
+    pushErrorCount.set(0);
+    pushStatusCollector.subscribeTopic(daVinciStoreTopicV4, 1);
+    Assert.assertTrue(pushStatusCollector.getTopicToPushStatusMap().containsKey(daVinciStoreTopicV4));
+    TestUtils.waitForNonDeterministicAssertion(
+        5,
+        TimeUnit.SECONDS,
+        false,
+        () -> verify(pushStatusStoreReader, times(3)).getPartitionStatus(daVinciStoreName, 4, 0, Optional.empty()));
+    Assert.assertEquals(pushErrorCount.get(), 0);
+    pushStatusCollector.handleServerPushStatusUpdate(daVinciStoreTopicV4, ExecutionStatus.COMPLETED, null);
     TestUtils.waitForNonDeterministicAssertion(
         2,
         TimeUnit.SECONDS,
@@ -280,8 +355,11 @@ public class PushStatusCollectorTest {
 
     pushCompletedCount.set(0);
     pushErrorCount.set(0);
-    Map<CharSequence, Integer> successfulInstancePushStatus = Collections.singletonMap("instance", 10);
-    Map<CharSequence, Integer> startedInstancePushStatus = Collections.singletonMap("instance", 2);
+    // DVC status
+    Map<CharSequence, Integer> startedInstancePushStatus =
+        Collections.singletonMap("instance", ExecutionStatus.STARTED.getValue());
+    Map<CharSequence, Integer> successfulInstancePushStatus =
+        Collections.singletonMap("instance", ExecutionStatus.COMPLETED.getValue());
 
     when(pushStatusStoreReader.getPartitionStatus(daVinciStoreName, 2, 0, Optional.empty()))
         .thenReturn(Collections.emptyMap());
