@@ -66,6 +66,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.samza.system.SystemProducer;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -73,6 +75,7 @@ import org.testng.annotations.Test;
 
 
 public class DaVinciClientMemoryLimitTest {
+  private static final Logger LOGGER = LogManager.getLogger(DaVinciClientMemoryLimitTest.class);
   private static final int TEST_TIMEOUT = 180_000;
   private VeniceClusterWrapper venice;
   private D2Client d2Client;
