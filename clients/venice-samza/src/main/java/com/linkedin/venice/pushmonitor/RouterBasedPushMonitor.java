@@ -182,7 +182,7 @@ public class RouterBasedPushMonitor implements Closeable {
     }
 
     // used only for testing
-    public void setMapper(ObjectMapper mapper) {
+    public static void setMapper(ObjectMapper mapper) {
       MAPPER = mapper;
     }
   }

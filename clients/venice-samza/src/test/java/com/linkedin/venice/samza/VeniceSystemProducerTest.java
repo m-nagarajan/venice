@@ -100,6 +100,7 @@ public class VeniceSystemProducerTest {
         new OutgoingMessageEnvelope(new SystemStream("venice", "storeName"), "key1", partialUpdateRecord);
 
     Assert.assertThrows(() -> producerInDC0.send("venice", envelope));
+    producerInDC0.stop();
   }
 
   @Test(dataProvider = "BatchOrStreamReprocessing")
@@ -150,6 +151,7 @@ public class VeniceSystemProducerTest {
       assertNotNull(capturedVwo.getPartitionCount());
       assertEquals((int) capturedVwo.getPartitionCount(), 2);
     }
+    producerInDC0.stop();
   }
 
   @DataProvider(name = "BatchOrStreamReprocessing")
