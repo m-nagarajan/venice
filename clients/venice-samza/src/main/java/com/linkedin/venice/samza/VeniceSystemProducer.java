@@ -27,7 +27,6 @@ import com.linkedin.venice.exceptions.VeniceException;
 import com.linkedin.venice.meta.Version;
 import com.linkedin.venice.partitioner.VenicePartitioner;
 import com.linkedin.venice.pubsub.api.PubSubProducerCallback;
-import com.linkedin.venice.pushmonitor.ExecutionStatus;
 import com.linkedin.venice.pushmonitor.HybridStoreQuotaStatus;
 import com.linkedin.venice.pushmonitor.RouterBasedHybridStoreQuotaMonitor;
 import com.linkedin.venice.pushmonitor.RouterBasedPushMonitor;
@@ -569,8 +568,7 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
       /**
        * If the stream reprocessing job has finished, push monitor will exit the Samza process directly.
        */
-      ExecutionStatus currentStatus = pushMonitor.get().getCurrentStatus();
-      if (ExecutionStatus.ERROR.equals(currentStatus)) {
+      if (pushMonitor.get().getCurrentStatus().isError()) {
         throw new VeniceException(
             "Push job for resource " + topicName + " is in error state; please reach out to Venice team.");
       }
@@ -609,7 +607,7 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
     Utils.closeQuietlyWithErrorLogged(veniceWriter);
     if (Version.PushType.STREAM_REPROCESSING.equals(pushType) && pushMonitor.isPresent()) {
       String versionTopic = Version.composeVersionTopicFromStreamReprocessingTopic(topicName);
-      switch (pushMonitor.get().getCurrentStatus()) {
+      switch (pushMonitor.get().getCurrentStatus().getRootStatus()) {
         case COMPLETED:
           LOGGER.info("Push job for {} is COMPLETED.", topicName);
           break;
@@ -654,8 +652,7 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
     }
 
     if (pushMonitor.isPresent() && Version.PushType.STREAM_REPROCESSING.equals(pushType)) {
-      ExecutionStatus currentStatus = pushMonitor.get().getCurrentStatus();
-      switch (currentStatus) {
+      switch (pushMonitor.get().getCurrentStatus().getRootStatus()) {
         case ERROR:
           /**
            * If there are multiple stream reprocessing SystemProducer in one Samza job, one failed push will

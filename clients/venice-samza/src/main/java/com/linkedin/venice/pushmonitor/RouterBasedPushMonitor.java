@@ -112,7 +112,7 @@ public class RouterBasedPushMonitor implements Closeable {
             continue;
           }
           pushMonitorService.setCurrentStatus(pushStatusResponse.getExecutionStatus());
-          switch (pushStatusResponse.getExecutionStatus()) {
+          switch (pushStatusResponse.getExecutionStatus().getRootStatus()) {
             case END_OF_PUSH_RECEIVED:
             case COMPLETED:
               LOGGER.info("Samza stream reprocessing has finished successfully for store version: {}", topicName);

@@ -28,6 +28,8 @@ public class PushMonitorUtils {
         return " due to disk being full";
       case DVC_INGESTION_ERROR_MEMORY_LIMIT_REACHED:
         return " due to memory limit reached";
+      case DVC_INGESTION_ERROR_TOO_MANY_DEAD_INSTANCES:
+        return " due to too many dead davinci instances"; // MANOJ check this
       default:
         return "";
     }
@@ -58,6 +60,7 @@ public class PushMonitorUtils {
         : ExecutionStatus.END_OF_PUSH_RECEIVED;
     Optional<String> erroredReplica = Optional.empty();
     int erroredPartitionId = 0;
+    // initialize errorReplicaStatus to ERROR and then set specific error status if found
     ExecutionStatus errorReplicaStatus = ExecutionStatus.ERROR;
     String storeName = Version.parseStoreFromKafkaTopicName(topicName);
     int version = Version.parseVersionFromVersionTopicName(topicName);
@@ -96,7 +99,7 @@ public class PushMonitorUtils {
         }
         allInstancesCompleted = false;
         allMiddleStatusReceived = false;
-        if (status.isIngestionError()) {
+        if (status.isError()) {
           erroredReplica = Optional.of(entry.getKey().toString());
           erroredPartitionId = partitionId;
           errorReplicaStatus = status;
@@ -120,7 +123,7 @@ public class PushMonitorUtils {
         if (lastUpdateTime + TimeUnit.MINUTES.toMillis(daVinciErrorInstanceWaitTime) < System.currentTimeMillis()) {
           storeVersionToDVCDeadInstanceTimeMap.remove(topicName);
           return new ExecutionStatusWithDetails(
-              ExecutionStatus.ERROR,
+              ExecutionStatus.DVC_INGESTION_ERROR_TOO_MANY_DEAD_INSTANCES,
               "Too many dead instances: " + offlineReplicaCount + ", total instances: " + totalReplicaCount
                   + ", example offline instances: " + offlineInstanceList,
               noDaVinciStatusReported);

@@ -87,6 +87,11 @@ public class PushStatusCollectorTest {
         Collections.singletonMap("instance", ExecutionStatus.DVC_INGESTION_ERROR_DISK_FULL.getValue());
     Map<CharSequence, Integer> memoryLimitErrorInstancePushStatus =
         Collections.singletonMap("instance", ExecutionStatus.DVC_INGESTION_ERROR_MEMORY_LIMIT_REACHED.getValue());
+    /*Map<CharSequence, Integer> memoryLimitErrorInstancePushStatus =
+        Collections.singletonMap("instance", ExecutionStatus.DVC_INGESTION_ERROR_TOO_MANY_DEAD_INSTANCES.getValue());*/ // MANOJ
+                                                                                                                         // add
+                                                                                                                         // more
+                                                                                                                         // tests
     Map<CharSequence, Integer> otherErrorInstancePushStatus =
         Collections.singletonMap("instance", ExecutionStatus.DVC_INGESTION_ERROR_OTHER.getValue());
 
