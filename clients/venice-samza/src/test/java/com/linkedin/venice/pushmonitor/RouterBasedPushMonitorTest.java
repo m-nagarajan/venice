@@ -1,13 +1,14 @@
 package com.linkedin.venice.pushmonitor;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertFalse;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.venice.client.store.transport.TransportClient;
 import com.linkedin.venice.client.store.transport.TransportClientResponse;
 import com.linkedin.venice.routerapi.PushStatusResponse;
@@ -27,27 +28,24 @@ public class RouterBasedPushMonitorTest {
     responseFuture.complete(transportClientResponse);
     when(transportClient.get(anyString())).thenReturn(responseFuture);
 
-    ObjectMapper mockMAPPER = mock(ObjectMapper.class);
-    PushStatusResponse pushStatusResponse = new PushStatusResponse();
-    pushStatusResponse.setExecutionStatus(ExecutionStatus.ERROR);
-    when(mockMAPPER.readValue(eq(transportClientResponse.getBody()), eq(PushStatusResponse.class)))
-        .thenReturn(pushStatusResponse);
-
     VeniceSystemFactory factory = mock(VeniceSystemFactory.class);
     SystemProducer producer = mock(SystemProducer.class);
 
     // Create the monitor and task
     RouterBasedPushMonitor monitor = new RouterBasedPushMonitor(transportClient, "topic", factory, producer);
     RouterBasedPushMonitor.PushMonitorTask task = monitor.getPushMonitorTask();
-    task.setMapper(mockMAPPER);
+    RouterBasedPushMonitor.PushMonitorTask mockTask = spy(task);
+    PushStatusResponse pushStatusResponse = new PushStatusResponse();
+    pushStatusResponse.setExecutionStatus(ExecutionStatus.ERROR);
+    doReturn(pushStatusResponse).when(mockTask).getPushStatusResponse(any());
 
     // Execute the task logic
-    task.run();
+    mockTask.run();
 
     // Verify expected behavior
     verify(factory).endStreamReprocessingSystemProducer(producer, false);
-    assertFalse(task.isRunning.get()); // Task should continue polling
-    task.close();
+    assertFalse(mockTask.isRunning.get()); // Task should continue polling
+    mockTask.close();
     monitor.close();
   }
 }
