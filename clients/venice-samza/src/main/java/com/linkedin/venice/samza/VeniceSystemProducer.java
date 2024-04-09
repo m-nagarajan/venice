@@ -158,6 +158,9 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
 
   private Map<String, String> additionalWriterConfigs = new HashMap<>();
 
+  private TransportClient transportClient;
+  RouterBasedHybridStoreQuotaMonitor.TransportClientReinitProvider reinitProvider;
+
   @Deprecated
   public VeniceSystemProducer(
       String primaryControllerColoD2ZKHost,
@@ -411,15 +414,7 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
     return new VeniceWriterFactory(finalWriterConfigs).createVeniceWriter(writerOptions);
   }
 
-  @Override
-  public synchronized void start() {
-    if (this.isStarted) {
-      return;
-    }
-    this.isStarted = true;
-
-    final TransportClient transportClient;
-    RouterBasedHybridStoreQuotaMonitor.TransportClientReinitProvider reinitProvider;
+  protected void setupClientsAndReInitProvider() {
     if (discoveryUrl.isPresent()) {
       this.controllerClient =
           ControllerClientFactory.discoverAndConstructControllerClient(storeName, discoveryUrl.get(), sslFactory, 1);
@@ -506,10 +501,28 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
         return new D2TransportClient(d2DiscoveryResponse.getD2Service(), childColoD2Client);
       };
     }
+  }
+
+  void getKeySchema() {
+    SchemaResponse keySchemaResponse =
+        (SchemaResponse) controllerRequestWithRetry(() -> getControllerClient().getKeySchema(this.storeName), 2);
+    LOGGER.info("Got [store: {}] SchemaResponse for key schema: {}", storeName, keySchemaResponse);
+    this.keySchema = parseSchemaFromJSONStrictValidation(keySchemaResponse.getSchemaStr());
+    this.canonicalKeySchemaStr = AvroCompatibilityHelper.toParsingForm(this.keySchema);
+  }
+
+  @Override
+  public synchronized void start() {
+    if (this.isStarted) {
+      return;
+    }
+    this.isStarted = true;
+
+    setupClientsAndReInitProvider();
 
     // Request all the necessary info from Venice Controller
     VersionCreationResponse versionCreationResponse = (VersionCreationResponse) controllerRequestWithRetry(
-        () -> this.controllerClient.requestTopicForWrites(
+        () -> getControllerClient().requestTopicForWrites(
             this.storeName,
             1,
             pushType,
@@ -528,16 +541,12 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
     this.kafkaBootstrapServers = versionCreationResponse.getKafkaBootstrapServers();
 
     StoreResponse storeResponse =
-        (StoreResponse) controllerRequestWithRetry(() -> this.controllerClient.getStore(storeName), 2);
+        (StoreResponse) controllerRequestWithRetry(() -> getControllerClient().getStore(storeName), 2);
     this.isWriteComputeEnabled = storeResponse.getStore().isWriteComputationEnabled();
 
     boolean hybridStoreDiskQuotaEnabled = storeResponse.getStore().isHybridStoreDiskQuotaEnabled();
 
-    SchemaResponse keySchemaResponse =
-        (SchemaResponse) controllerRequestWithRetry(() -> this.controllerClient.getKeySchema(this.storeName), 2);
-    LOGGER.info("Got [store: {}] SchemaResponse for key schema: {}", storeName, keySchemaResponse);
-    this.keySchema = parseSchemaFromJSONStrictValidation(keySchemaResponse.getSchemaStr());
-    this.canonicalKeySchemaStr = AvroCompatibilityHelper.toParsingForm(this.keySchema);
+    getKeySchema();
 
     // Load Schemas from Venice
     refreshSchemaCache();
@@ -583,9 +592,9 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
   }
 
   // Grabs all Venice schemas and their associated ID's and caches them
-  private void refreshSchemaCache() {
+  void refreshSchemaCache() {
     MultiSchemaResponse valueSchemaResponse = (MultiSchemaResponse) controllerRequestWithRetry(
-        () -> this.controllerClient.getAllValueAndDerivedSchema(this.storeName),
+        () -> getControllerClient().getAllValueAndDerivedSchema(this.storeName),
         2);
     LOGGER.info("Got [store: {}] SchemaResponse for value schemas: {}", storeName, valueSchemaResponse);
     for (MultiSchemaResponse.Schema valueSchema: valueSchemaResponse.getSchemas()) {
@@ -624,12 +633,12 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
            * the containers send kill requests to controller at the same time to avoid hammering on controller.
            */
           Utils.sleep(ThreadLocalRandom.current().nextInt(30000));
-          controllerClient.retryableRequest(3, c -> c.killOfflinePushJob(versionTopic));
+          getControllerClient().retryableRequest(3, c -> c.killOfflinePushJob(versionTopic));
           LOGGER.info("Offline push job has been killed, topic: {}", versionTopic);
       }
       Utils.closeQuietlyWithErrorLogged(pushMonitor.get());
     }
-    Utils.closeQuietlyWithErrorLogged(controllerClient);
+    Utils.closeQuietlyWithErrorLogged(getControllerClient());
     hybridStoreQuotaMonitor.ifPresent(Utils::closeQuietlyWithErrorLogged);
     d2ZkHostToClientEnvelopeMap.values().forEach(Utils::closeQuietlyWithErrorLogged);
   }
@@ -937,6 +946,10 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
     }
   }
 
+  protected ControllerClient getControllerClient() {
+    return this.controllerClient;
+  }
+
   // used only for testing
   protected void setIsStarted(boolean isStarted) {
     this.isStarted = isStarted;
@@ -945,10 +958,5 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
   // used only for testing
   protected void setPushMonitor(RouterBasedPushMonitor pushMonitor) {
     this.pushMonitor = Optional.of(pushMonitor);
-  }
-
-  // used only for testing
-  protected void setTopicName(String topicName) {
-    this.topicName = topicName;
   }
 }
