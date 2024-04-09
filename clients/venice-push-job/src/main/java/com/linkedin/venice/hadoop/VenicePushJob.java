@@ -628,7 +628,7 @@ public class VenicePushJob implements AutoCloseable {
     return computeJob;
   }
 
-  private DataWriterComputeJob getDataWriterComputeJob() {
+  protected DataWriterComputeJob getDataWriterComputeJob() {
     if (dataWriterComputeJob != null) {
       return dataWriterComputeJob;
     }
@@ -2890,5 +2890,10 @@ public class VenicePushJob implements AutoCloseable {
     try (VenicePushJob job = new VenicePushJob(jobId, props)) {
       job.run();
     }
+  }
+
+  // used only for testing
+  protected void setDataWriterComputeJob(DataWriterComputeJob dataWriterComputeJob) {
+    this.dataWriterComputeJob = dataWriterComputeJob;
   }
 }

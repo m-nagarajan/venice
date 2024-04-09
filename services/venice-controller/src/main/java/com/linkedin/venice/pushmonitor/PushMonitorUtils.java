@@ -28,8 +28,6 @@ public class PushMonitorUtils {
         return " due to disk being full";
       case DVC_INGESTION_ERROR_MEMORY_LIMIT_REACHED:
         return " due to memory limit reached";
-      case DVC_INGESTION_ERROR_TOO_MANY_DEAD_INSTANCES:
-        return " due to too many dead davinci instances"; // MANOJ check this
       default:
         return "";
     }
