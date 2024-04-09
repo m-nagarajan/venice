@@ -70,10 +70,10 @@ public class RouterBasedPushMonitor implements Closeable {
     this.pushMonitorTask.exitMode = exitMode;
   }
 
-  private static class PushMonitorTask implements Runnable, Closeable {
-    private static final ObjectMapper MAPPER = ObjectMapperFactory.getInstance();
+  protected static class PushMonitorTask implements Runnable, Closeable {
+    private static ObjectMapper MAPPER = ObjectMapperFactory.getInstance();
 
-    private final AtomicBoolean isRunning;
+    protected final AtomicBoolean isRunning;
     private final String topicName;
     private final TransportClient transportClient;
     private final String requestPath;
@@ -156,6 +156,7 @@ public class RouterBasedPushMonitor implements Closeable {
               LOGGER.info("Stream reprocessing job failed for store version: {}", topicName);
               factory.endStreamReprocessingSystemProducer(producer, false);
               // Stop polling
+              close();
               return;
             default:
               LOGGER.info(
@@ -179,5 +180,15 @@ public class RouterBasedPushMonitor implements Closeable {
     private static String buildPushStatusRequestPath(String topicName) {
       return TYPE_PUSH_STATUS + "/" + topicName;
     }
+
+    // used only for testing
+    public void setMapper(ObjectMapper mapper) {
+      MAPPER = mapper;
+    }
+  }
+
+  // used only for testing
+  protected PushMonitorTask getPushMonitorTask() {
+    return pushMonitorTask;
   }
 }
