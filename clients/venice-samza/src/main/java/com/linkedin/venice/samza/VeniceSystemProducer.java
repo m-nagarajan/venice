@@ -936,4 +936,19 @@ public class VeniceSystemProducer implements SystemProducer, Closeable {
       }
     }
   }
+
+  // used only for testing
+  protected void setIsStarted(boolean isStarted) {
+    this.isStarted = isStarted;
+  }
+
+  // used only for testing
+  protected void setPushMonitor(RouterBasedPushMonitor pushMonitor) {
+    this.pushMonitor = Optional.of(pushMonitor);
+  }
+
+  // used only for testing
+  protected void setTopicName(String topicName) {
+    this.topicName = topicName;
+  }
 }
