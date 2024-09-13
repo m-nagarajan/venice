@@ -14,7 +14,7 @@ public enum PushJobDetailsStatus {
   private static final Set<Integer> TERMINAL_STATUSES =
       new HashSet<>(Arrays.asList(COMPLETED.getValue(), ERROR.getValue(), KILLED.getValue()));
 
-  public static final Set<PushJobDetailsStatus> TERMINAL_FAILED_STATUSES = new HashSet<>(Arrays.asList(ERROR, KILLED));
+  private static final Set<PushJobDetailsStatus> TERMINAL_FAILED_STATUSES = new HashSet<>(Arrays.asList(ERROR, KILLED));
   private final int value;
 
   PushJobDetailsStatus(int value) {

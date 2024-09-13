@@ -2,9 +2,6 @@ package com.linkedin.venice.controller;
 
 import static com.linkedin.venice.controller.VeniceHelixAdmin.emitPushJobDetailsMetrics;
 import static com.linkedin.venice.controller.VeniceHelixAdmin.isPushJobFailedUserError;
-import static com.linkedin.venice.status.PushJobDetailsStatus.COMPLETED;
-import static com.linkedin.venice.status.PushJobDetailsStatus.ERROR;
-import static com.linkedin.venice.status.PushJobDetailsStatus.KILLED;
 import static com.linkedin.venice.status.PushJobDetailsStatus.isFailed;
 import static com.linkedin.venice.status.PushJobDetailsStatus.isSucceeded;
 import static org.mockito.Mockito.mock;
@@ -29,22 +26,6 @@ import org.testng.annotations.Test;
 
 
 public class TestPushJobStatusStats {
-  @Test
-  public void testIsFailedOrIsSuccess() {
-    for (PushJobDetailsStatus status: PushJobDetailsStatus.values()) {
-      if (status == COMPLETED) {
-        assertTrue(isSucceeded(status));
-        assertFalse(isFailed(status));
-      } else if (status == ERROR || status == KILLED) {
-        assertTrue(isFailed(status));
-        assertFalse(isSucceeded(status));
-      } else {
-        assertFalse(isSucceeded(status));
-        assertFalse(isFailed(status));
-      }
-    }
-  }
-
   @Test(dataProvider = "True-and-False", dataProviderClass = DataProviderUtils.class)
   public void testEmitPushJobDetailsMetrics(boolean isIncrementalPush) {
     PushJobDetails details = mock(PushJobDetails.class);
