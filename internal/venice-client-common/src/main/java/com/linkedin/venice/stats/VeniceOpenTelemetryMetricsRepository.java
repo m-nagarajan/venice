@@ -49,7 +49,7 @@ public class VeniceOpenTelemetryMetricsRepository {
 
   public VeniceOpenTelemetryMetricsRepository(VeniceMetricsConfig metricsConfig) {
     LOGGER.info("OPENTELEMETRY INITIALIZATION STARTED");
-    this.metricPrefix = "Venice" + metricsConfig.getMetricPrefix();
+    this.metricPrefix = "Venice." + metricsConfig.getMetricPrefix();
     final String fluentBitTag = String.format(
         FLUENTBIT_TAG_PATTERN,
         metricsConfig.getServiceName(),
@@ -87,7 +87,7 @@ public class VeniceOpenTelemetryMetricsRepository {
       // Register MeterProvider with OpenTelemetry instance
       openTelemetry = OpenTelemetrySdk.builder().setMeterProvider(sdkMeterProvider).build();
 
-      this.meter = openTelemetry.getMeter(metricsConfig.getMetricPrefix());
+      this.meter = openTelemetry.getMeter(metricPrefix);
       LOGGER.info("OPENTELEMETRY INITIALIZATION COMPLETED");
     } catch (Exception e) {
       LOGGER.error("OPENTELEMETRY INITIALIZATION FAILED", e);
