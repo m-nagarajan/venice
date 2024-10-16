@@ -244,6 +244,7 @@ public class VeniceResponseAggregator implements ResponseAggregatorFactory<Basic
       // here...
       double latency = LatencyUtils.convertNSToMS(timeValue.getRawValue(TimeUnit.NANOSECONDS));
       stats.recordLatency(storeName, latency);
+      // new metrics can be added here based on responseStatus
       if (HEALTHY_STATUSES.contains(responseStatus)) {
         routerStats.getStatsByType(RequestType.SINGLE_GET)
             .recordReadQuotaUsage(storeName, venicePath.getPartitionKeys().size());

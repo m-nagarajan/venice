@@ -3,8 +3,8 @@ package com.linkedin.venice.router;
 import com.linkedin.venice.meta.ReadOnlyStoreRepository;
 import com.linkedin.venice.read.RequestType;
 import com.linkedin.venice.router.stats.AggRouterHttpRequestStats;
+import com.linkedin.venice.stats.VeniceMetricsRepository;
 import com.linkedin.venice.tehuti.MockTehutiReporter;
-import io.tehuti.metrics.MetricsRepository;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;
@@ -12,13 +12,13 @@ import org.testng.annotations.Test;
 
 
 public class AggRouterHttpRequestStatsTest {
-  MetricsRepository metricsRepository;
+  VeniceMetricsRepository metricsRepository;
   private MockTehutiReporter reporter;
   private ReadOnlyStoreRepository storeMetadataRepository;
 
   @BeforeSuite
   public void setUp() {
-    this.metricsRepository = new MetricsRepository();
+    this.metricsRepository = new VeniceMetricsRepository();
     reporter = new MockTehutiReporter();
     metricsRepository.addReporter(reporter);
     storeMetadataRepository = Mockito.mock(ReadOnlyStoreRepository.class);

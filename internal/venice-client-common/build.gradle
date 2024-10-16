@@ -39,6 +39,11 @@ dependencies {
   implementation libraries.log4j2api
   implementation libraries.zstd
   implementation libraries.conscrypt
+  implementation(platform("io.opentelemetry:opentelemetry-bom:1.38.0"))
+  implementation("io.opentelemetry:opentelemetry-api")
+  implementation("io.opentelemetry:opentelemetry-sdk")
+  implementation("io.opentelemetry:opentelemetry-exporter-logging")
+  implementation("io.opentelemetry:opentelemetry-exporter-prometheus:1.39.0-alpha")
 
   testImplementation project(':internal:venice-test-common')
   testImplementation project(':clients:venice-thin-client')

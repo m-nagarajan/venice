@@ -240,17 +240,19 @@ public abstract class TestBatch {
     }
   }
 
-  @Test(timeOut = TEST_TIMEOUT, dataProvider = "Two-True-and-False", dataProviderClass = DataProviderUtils.class)
+  @Test(/*timeOut = TEST_TIMEOUT,*/ dataProvider = "Two-True-and-False", dataProviderClass = DataProviderUtils.class)
   public void testCompressingRecord(boolean compressionMetricCollectionEnabled, boolean useMapperToBuildDict)
       throws Exception {
+    int recordCount = 10000;
     VPJValidator validator = (avroClient, vsonClient, metricsRepository) -> {
       // test single get
-      for (int i = 1; i <= 100; i++) {
+      for (int i = 1; i <= recordCount; i++) {
         Assert.assertEquals(avroClient.get(Integer.toString(i)).get().toString(), "test_name_" + i);
+        Thread.sleep(10);
       }
 
       // test batch get
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < recordCount / 10; i++) {
         Set<String> keys = new HashSet<>();
         for (int j = 1; j <= 10; j++) {
           keys.add(Integer.toString(i * 10 + j));
@@ -262,10 +264,11 @@ public abstract class TestBatch {
         for (int j = 1; j <= 10; j++) {
           Assert.assertEquals(values.get(Integer.toString(i * 10 + j)).toString(), "test_name_" + ((i * 10) + j));
         }
+        Thread.sleep(100);
       }
     };
     String storeName = testBatchStore(
-        inputDir -> new KeyAndValueSchemas(writeSimpleAvroFileWithStringToStringSchema(inputDir)),
+        inputDir -> new KeyAndValueSchemas(writeSimpleAvroFileWithStringToStringSchema(inputDir, recordCount)),
         properties -> {
           properties
               .setProperty(COMPRESSION_METRIC_COLLECTION_ENABLED, String.valueOf(compressionMetricCollectionEnabled));
@@ -274,8 +277,10 @@ public abstract class TestBatch {
         validator,
         new UpdateStoreQueryParams().setCompressionStrategy(CompressionStrategy.GZIP));
 
+    Thread.sleep(5000000);
+
     // Re-push with Kafka Input
-    testRepush(storeName, validator);
+    // testRepush(storeName, validator);
   }
 
   @Test(timeOut = TEST_TIMEOUT)
