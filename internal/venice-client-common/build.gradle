@@ -44,6 +44,7 @@ dependencies {
   implementation("io.opentelemetry:opentelemetry-sdk")
   implementation("io.opentelemetry:opentelemetry-exporter-logging")
   implementation("io.opentelemetry:opentelemetry-exporter-prometheus:1.39.0-alpha")
+  implementation("io.opentelemetry:opentelemetry-exporter-otlp")
 
   testImplementation project(':internal:venice-test-common')
   testImplementation project(':clients:venice-thin-client')

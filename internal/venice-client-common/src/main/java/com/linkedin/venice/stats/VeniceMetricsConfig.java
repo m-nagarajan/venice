@@ -7,6 +7,7 @@ public class VeniceMetricsConfig {
   private final String serviceName;
   private final String metricPrefix;
   private final boolean emitDeltaTelemetry;
+  private final boolean emitToFluentbit;
   private final boolean emitToPrometheus; // for debug purposes
   private final boolean emitToLog; // for debug purposes
   private final MetricConfig tehutiMetricConfig;
@@ -15,6 +16,7 @@ public class VeniceMetricsConfig {
     this.serviceName = veniceMetricsConfigBuilder.serviceName;
     this.metricPrefix = veniceMetricsConfigBuilder.metricPrefix;
     this.emitDeltaTelemetry = veniceMetricsConfigBuilder.emitDeltaTelemetry;
+    this.emitToFluentbit = veniceMetricsConfigBuilder.emitToFluentbit;
     this.emitToPrometheus = veniceMetricsConfigBuilder.emitToPrometheus;
     this.emitToLog = veniceMetricsConfigBuilder.emitToLog;
     this.tehutiMetricConfig = veniceMetricsConfigBuilder.tehutiMetricConfig;
@@ -24,6 +26,7 @@ public class VeniceMetricsConfig {
     private String serviceName = "NOOP_SERVICE";
     private String metricPrefix = null;
     private boolean emitDeltaTelemetry = true;
+    private boolean emitToFluentbit = false;
     private boolean emitToPrometheus = false;
     private boolean emitToLog = true;
     private MetricConfig tehutiMetricConfig = null;
@@ -40,6 +43,11 @@ public class VeniceMetricsConfig {
 
     public VeniceMetricsConfigBuilder setEmitDeltaTelemetry(boolean emitDeltaTelemetry) {
       this.emitDeltaTelemetry = emitDeltaTelemetry;
+      return this;
+    }
+
+    public VeniceMetricsConfigBuilder setEmitToFluentbit(boolean emitToFluentbit) {
+      this.emitToFluentbit = emitToFluentbit;
       return this;
     }
 
@@ -85,6 +93,10 @@ public class VeniceMetricsConfig {
 
   public boolean isEmitDeltaTelemetry() {
     return emitDeltaTelemetry;
+  }
+
+  public boolean isEmitToFluentbit() {
+    return emitToFluentbit;
   }
 
   public boolean isEmitToPrometheus() {

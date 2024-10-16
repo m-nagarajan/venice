@@ -7,6 +7,8 @@ import io.opentelemetry.api.metrics.DoubleHistogramBuilder;
 import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.LongCounterBuilder;
 import io.opentelemetry.api.metrics.Meter;
+import io.opentelemetry.exporter.otlp.http.metrics.OtlpHttpMetricExporter;
+import io.opentelemetry.exporter.otlp.http.metrics.OtlpHttpMetricExporterBuilder;
 import io.opentelemetry.exporter.prometheus.PrometheusHttpServer;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.common.CompletableResultCode;
@@ -15,8 +17,10 @@ import io.opentelemetry.sdk.metrics.SdkMeterProvider;
 import io.opentelemetry.sdk.metrics.SdkMeterProviderBuilder;
 import io.opentelemetry.sdk.metrics.data.AggregationTemporality;
 import io.opentelemetry.sdk.metrics.data.MetricData;
+import io.opentelemetry.sdk.metrics.export.AggregationTemporalitySelector;
 import io.opentelemetry.sdk.metrics.export.MetricExporter;
 import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
+import io.opentelemetry.sdk.resources.Resource;
 import java.util.ArrayList;
 import java.util.Collection;
 import org.apache.logging.log4j.LogManager;
@@ -50,28 +54,6 @@ public class VeniceOpenTelemetryMetricsRepository {
   public VeniceOpenTelemetryMetricsRepository(VeniceMetricsConfig metricsConfig) {
     LOGGER.info("OPENTELEMETRY INITIALIZATION STARTED");
     this.metricPrefix = "Venice." + metricsConfig.getMetricPrefix();
-    final String fluentBitTag = String.format(
-        FLUENTBIT_TAG_PATTERN,
-        metricsConfig.getServiceName(),
-        "i001", // instance
-        metricsConfig.getServiceName(), // container name
-        NOOP_ACCOUNT,
-        NOOP_NAMESPACE);
-
-    /* OtlpHttpMetricExporterBuilder exporterBuilder = OtlpHttpMetricExporter.builder().
-            setEndpoint(FLUENTBIT_ENDPOINT).
-            addHeader(FLUENTBIT_HEADER_NAME, fluentBitTag).
-            setAggregationTemporalitySelector(AggregationTemporalitySelector.deltaPreferred());
-    
-    SdkMeterProvider sdkMeterProvider =
-            SdkMeterProvider.builder()
-                    //.registerMetricReader(PeriodicMetricReader.builder(exporterBuilder.build()).build())
-                    // Enable this local exporter to log metrics to console for troubleshooting
-                    //.registerMetricReader(PeriodicMetricReader.builder(new LogBasedMetricExporter()).build())
-                    .setResource(Resource.empty()) // Resource has to be empty so that Fluentbit can add them
-                    .build();
-    
-    return OpenTelemetrySdk.builder().setMeterProvider(sdkMeterProvider).build(); */
 
     try {
       SdkMeterProviderBuilder builder = SdkMeterProvider.builder();
@@ -82,6 +64,21 @@ public class VeniceOpenTelemetryMetricsRepository {
       if (metricsConfig.isEmitToLog()) {
         builder.registerMetricReader(PeriodicMetricReader.builder(new LogBasedMetricExporter()).build());
       }
+      if (metricsConfig.isEmitToFluentbit()) {
+        final String fluentBitTag = String.format(
+            FLUENTBIT_TAG_PATTERN,
+            metricsConfig.getServiceName(),
+            "i001", // instance
+            metricsConfig.getServiceName(), // container name
+            NOOP_ACCOUNT,
+            NOOP_NAMESPACE);
+        OtlpHttpMetricExporterBuilder fluentbitExporterBuilder = OtlpHttpMetricExporter.builder()
+            .setEndpoint(FLUENTBIT_ENDPOINT)
+            .addHeader(FLUENTBIT_HEADER_NAME, fluentBitTag)
+            .setAggregationTemporalitySelector(AggregationTemporalitySelector.deltaPreferred());
+        builder.registerMetricReader(PeriodicMetricReader.builder(fluentbitExporterBuilder.build()).build());
+      }
+      builder.setResource(Resource.empty()); // Resource has to be empty so that Fluentbit can add them
       sdkMeterProvider = builder.build();
 
       // Register MeterProvider with OpenTelemetry instance
