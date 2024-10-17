@@ -3,8 +3,10 @@ package com.linkedin.venice.router;
 import com.linkedin.venice.meta.ReadOnlyStoreRepository;
 import com.linkedin.venice.read.RequestType;
 import com.linkedin.venice.router.stats.AggRouterHttpRequestStats;
+import com.linkedin.venice.stats.VeniceMetricsRepository;
+import com.linkedin.venice.stats.VeniceResponseStatus;
 import com.linkedin.venice.tehuti.MockTehutiReporter;
-import io.tehuti.metrics.MetricsRepository;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;
@@ -12,13 +14,13 @@ import org.testng.annotations.Test;
 
 
 public class AggRouterHttpRequestStatsTest {
-  MetricsRepository metricsRepository;
+  VeniceMetricsRepository metricsRepository;
   private MockTehutiReporter reporter;
   private ReadOnlyStoreRepository storeMetadataRepository;
 
   @BeforeSuite
   public void setUp() {
-    this.metricsRepository = new MetricsRepository();
+    this.metricsRepository = new VeniceMetricsRepository();
     reporter = new MockTehutiReporter();
     metricsRepository.addReporter(reporter);
     storeMetadataRepository = Mockito.mock(ReadOnlyStoreRepository.class);
@@ -45,7 +47,7 @@ public class AggRouterHttpRequestStatsTest {
     Assert.assertEquals(reporter.query(".store1--error_retry.Count").value(), 1d);
 
     for (int i = 1; i <= 100; i += 1) {
-      stats.recordLatency("store2", i);
+      stats.recordLatency("store2", i, HttpResponseStatus.OK, VeniceResponseStatus.HEALTHY);
     }
 
     Assert.assertEquals((int) reporter.query(".total--latency.50thPercentile").value(), 50);

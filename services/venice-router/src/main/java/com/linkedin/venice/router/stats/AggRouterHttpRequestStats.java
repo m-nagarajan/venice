@@ -5,8 +5,10 @@ import com.linkedin.venice.meta.ReadOnlyStoreRepository;
 import com.linkedin.venice.read.RequestType;
 import com.linkedin.venice.stats.AbstractVeniceAggStats;
 import com.linkedin.venice.stats.AbstractVeniceAggStoreStats;
+import com.linkedin.venice.stats.VeniceMetricsRepository;
+import com.linkedin.venice.stats.VeniceResponseStatus;
 import com.linkedin.venice.utils.concurrent.VeniceConcurrentHashMap;
-import io.tehuti.metrics.MetricsRepository;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -15,7 +17,7 @@ public class AggRouterHttpRequestStats extends AbstractVeniceAggStoreStats<Route
   private final Map<String, ScatterGatherStats> scatterGatherStatsMap = new VeniceConcurrentHashMap<>();
 
   public AggRouterHttpRequestStats(
-      MetricsRepository metricsRepository,
+      VeniceMetricsRepository metricsRepository,
       RequestType requestType,
       ReadOnlyStoreRepository metadataRepository,
       boolean isUnregisterMetricForDeletedStoreEnabled) {
@@ -23,7 +25,7 @@ public class AggRouterHttpRequestStats extends AbstractVeniceAggStoreStats<Route
   }
 
   public AggRouterHttpRequestStats(
-      MetricsRepository metricsRepository,
+      VeniceMetricsRepository metricsRepository,
       RequestType requestType,
       boolean isKeyValueProfilingEnabled,
       ReadOnlyStoreRepository metadataRepository,
@@ -144,9 +146,13 @@ public class AggRouterHttpRequestStats extends AbstractVeniceAggStoreStats<Route
     getStoreStats(storeName).recordFanoutRequestCount(count);
   }
 
-  public void recordLatency(String storeName, double latency) {
-    totalStats.recordLatency(latency);
-    getStoreStats(storeName).recordLatency(latency);
+  public void recordLatency(
+      String storeName,
+      double latency,
+      HttpResponseStatus responseStatus,
+      VeniceResponseStatus veniceResponseStatus) {
+    totalStats.recordLatency(latency, responseStatus, veniceResponseStatus);
+    getStoreStats(storeName).recordLatency(latency, responseStatus, veniceResponseStatus);
   }
 
   public void recordResponseWaitingTime(String storeName, double waitingTime) {

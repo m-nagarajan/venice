@@ -11,6 +11,8 @@ public abstract class AbstractVeniceAggStats<T extends AbstractVeniceStats> {
   protected final Map<String, T> storeStats = new VeniceConcurrentHashMap<>();
 
   private StatsSupplier<T> statsFactory;
+  private StatsSupplierNew<T> statsFactoryNew;
+
   private final MetricsRepository metricsRepository;
 
   private AbstractVeniceAggStats(MetricsRepository metricsRepository, StatsSupplier<T> statsSupplier, T totalStats) {
@@ -19,7 +21,23 @@ public abstract class AbstractVeniceAggStats<T extends AbstractVeniceStats> {
     this.totalStats = totalStats;
   }
 
+  private AbstractVeniceAggStats(
+      VeniceMetricsRepository metricsRepository,
+      StatsSupplierNew<T> statsSupplier,
+      T totalStats) {
+    this.metricsRepository = metricsRepository;
+    this.statsFactoryNew = statsSupplier;
+    this.totalStats = totalStats;
+  }
+
   public AbstractVeniceAggStats(MetricsRepository metricsRepository, StatsSupplier<T> statsSupplier) {
+    this(metricsRepository, statsSupplier, statsSupplier.get(metricsRepository, STORE_NAME_FOR_TOTAL_STAT, null));
+  }
+
+  public AbstractVeniceAggStats(
+      VeniceMetricsRepository metricsRepository,
+      StatsSupplierNew<T> statsSupplier,
+      String dummy) {
     this(metricsRepository, statsSupplier, statsSupplier.get(metricsRepository, STORE_NAME_FOR_TOTAL_STAT, null));
   }
 
@@ -27,9 +45,13 @@ public abstract class AbstractVeniceAggStats<T extends AbstractVeniceStats> {
     this.metricsRepository = metricsRepository;
   }
 
-  public void setStatsSupplier(StatsSupplier<T> statsSupplier) {
-    this.statsFactory = statsSupplier;
-    this.totalStats = statsSupplier.get(metricsRepository, STORE_NAME_FOR_TOTAL_STAT, null);
+  public void setStatsSupplier(StatsSupplierNew<T> statsSupplier) {
+    this.statsFactoryNew = statsSupplier;
+    if (metricsRepository instanceof VeniceMetricsRepository) {
+      this.totalStats = statsSupplier.get((VeniceMetricsRepository) metricsRepository, STORE_NAME_FOR_TOTAL_STAT, null);
+    } else {
+      throw new RuntimeException("MetricsRepository is not an instance of VeniceMetricsRepository");
+    }
   }
 
   public AbstractVeniceAggStats(
@@ -43,7 +65,13 @@ public abstract class AbstractVeniceAggStats<T extends AbstractVeniceStats> {
   }
 
   public T getStoreStats(String storeName) {
-    return storeStats.computeIfAbsent(storeName, k -> statsFactory.get(metricsRepository, storeName, totalStats));
+    if (metricsRepository instanceof VeniceMetricsRepository) {
+      return storeStats.computeIfAbsent(
+          storeName,
+          k -> statsFactoryNew.get((VeniceMetricsRepository) metricsRepository, storeName, totalStats));
+    } else {
+      return storeStats.computeIfAbsent(storeName, k -> statsFactory.get(metricsRepository, storeName, totalStats));
+    }
   }
 
   public T getTotalStats() {

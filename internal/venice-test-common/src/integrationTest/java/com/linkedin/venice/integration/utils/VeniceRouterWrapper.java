@@ -60,6 +60,7 @@ public class VeniceRouterWrapper extends ProcessWrapper implements MetricsAware 
   public static final String CLUSTER_DISCOVERY_D2_SERVICE_NAME =
       ClientConfig.DEFAULT_CLUSTER_DISCOVERY_D2_SERVICE_NAME + "_test";
   private static final String ROUTER_SERVICE_NAME = "venice-router";
+  private static final String ROUTER_SERVICE_METRIC_PREFIX = "Router";
   private final VeniceProperties properties;
   private final String zkAddress;
   private RouterServer service;
@@ -175,7 +176,7 @@ public class VeniceRouterWrapper extends ProcessWrapper implements MetricsAware 
           d2Servers,
           Optional.empty(),
           Optional.of(SslUtils.getVeniceLocalSslFactory()),
-          TehutiUtils.getMetricsRepository(ROUTER_SERVICE_NAME),
+          TehutiUtils.getVeniceMetricsRepository(ROUTER_SERVICE_NAME, ROUTER_SERVICE_METRIC_PREFIX),
           D2TestUtils.getAndStartD2Client(zkAddress),
           CLUSTER_DISCOVERY_D2_SERVICE_NAME);
       return new VeniceRouterWrapper(
@@ -237,7 +238,7 @@ public class VeniceRouterWrapper extends ProcessWrapper implements MetricsAware 
         d2Servers,
         Optional.empty(),
         Optional.of(SslUtils.getVeniceLocalSslFactory()),
-        TehutiUtils.getMetricsRepository(ROUTER_SERVICE_NAME),
+        TehutiUtils.getVeniceMetricsRepository(ROUTER_SERVICE_NAME, ROUTER_SERVICE_METRIC_PREFIX),
         D2TestUtils.getAndStartD2Client(zkAddress),
         CLUSTER_DISCOVERY_D2_SERVICE_NAME);
     LOGGER.info("Started VeniceRouterWrapper: {}", this);

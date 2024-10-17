@@ -64,6 +64,11 @@ dependencies {
   implementation libraries.httpAsyncClient
   implementation project(':internal:alpini:router:alpini-router-api')
   implementation project(':internal:alpini:router:alpini-router-impl')
+  implementation(platform("io.opentelemetry:opentelemetry-bom:1.38.0"))
+  implementation("io.opentelemetry:opentelemetry-api")
+  implementation("io.opentelemetry:opentelemetry-sdk")
+  implementation("io.opentelemetry:opentelemetry-exporter-logging")
+  implementation("io.opentelemetry:opentelemetry-exporter-prometheus:1.39.0-alpha")
 
   testImplementation project(':clients:venice-thin-client')
   testImplementation libraries.kafkaClientsTest // TODO: Get rid of Kafka dependency in venice-common (used by TopicCreator)

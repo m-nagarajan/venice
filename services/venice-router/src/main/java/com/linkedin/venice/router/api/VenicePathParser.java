@@ -33,10 +33,10 @@ import com.linkedin.venice.router.stats.AggRouterHttpRequestStats;
 import com.linkedin.venice.router.stats.RouterStats;
 import com.linkedin.venice.router.streaming.VeniceChunkedWriteHandler;
 import com.linkedin.venice.router.utils.VeniceRouterUtils;
+import com.linkedin.venice.stats.VeniceMetricsRepository;
 import com.linkedin.venice.streaming.StreamingUtils;
 import com.linkedin.venice.utils.concurrent.VeniceConcurrentHashMap;
 import io.netty.channel.ChannelHandlerContext;
-import io.tehuti.metrics.MetricsRepository;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -107,7 +107,7 @@ public class VenicePathParser<HTTP_REQUEST extends BasicHttpRequest>
   private final ReadOnlyStoreRepository storeRepository;
   private final VeniceRouterConfig routerConfig;
   private final CompressorFactory compressorFactory;
-  private final MetricsRepository metricsRepository;
+  private final VeniceMetricsRepository metricsRepository;
   private final ScheduledExecutorService retryManagerScheduler;
   private final Map<String, RetryManager> routerSingleKeyRetryManagers;
   private final Map<String, RetryManager> routerMultiKeyRetryManagers;
@@ -127,7 +127,7 @@ public class VenicePathParser<HTTP_REQUEST extends BasicHttpRequest>
       ReadOnlyStoreRepository storeRepository,
       VeniceRouterConfig routerConfig,
       CompressorFactory compressorFactory,
-      MetricsRepository metricsRepository,
+      VeniceMetricsRepository metricsRepository,
       ScheduledExecutorService retryManagerScheduler) {
     this.versionFinder = versionFinder;
     this.partitionFinder = partitionFinder;
