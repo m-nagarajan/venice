@@ -29,15 +29,12 @@ import org.apache.logging.log4j.Logger;
 
 public class VeniceOpenTelemetryMetricsRepository {
   private static final Logger LOGGER = LogManager.getLogger(VeniceOpenTelemetryMetricsRepository.class);
-
   private static final String FLUENTBIT_TAG_PATTERN =
       "serviceName:%s,instanceId:%s,containerName:%s,mdmAccount:%s,mdmNamespace:%s";
   private static final String FLUENTBIT_ENDPOINT = "http://[::1]:22784/v1/metrics";
   private static final String FLUENTBIT_HEADER_NAME = "X-LI-Fluentbit-Tag";
-
   private static final String NOOP_ACCOUNT = "noopAccount";
   private static final String NOOP_NAMESPACE = "noopNamespace";
-
   private OpenTelemetry openTelemetry = null;
   private SdkMeterProvider sdkMeterProvider = null;
   Meter meter;

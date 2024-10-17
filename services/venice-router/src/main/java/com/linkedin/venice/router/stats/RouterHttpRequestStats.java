@@ -9,7 +9,10 @@ import com.linkedin.venice.stats.AbstractVeniceHttpStats;
 import com.linkedin.venice.stats.LambdaStat;
 import com.linkedin.venice.stats.TehutiUtils;
 import com.linkedin.venice.stats.VeniceMetricsConfig;
+import com.linkedin.venice.stats.VeniceMetricsDimensions;
 import com.linkedin.venice.stats.VeniceMetricsRepository;
+import com.linkedin.venice.stats.VeniceResponseStatus;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.DoubleHistogram;
 import io.opentelemetry.api.metrics.LongCounter;
@@ -40,12 +43,8 @@ public class RouterHttpRequestStats extends AbstractVeniceHttpStats {
   private final Sensor requestSensor;
   private final LongCounter requestSensorOtel;
   private final Sensor healthySensor;
-  private final LongCounter healthySensorOtel;
   private final Sensor unhealthySensor;
-  private final LongCounter unhealthySensorOtel;
   private final Sensor tardySensor;
-  private final LongCounter tardySensorOtel;
-  // response status based metrics
   private final Sensor healthyRequestRateSensor;
   private final Sensor tardyRequestRatioSensor;
   private final Sensor throttleSensor;
@@ -54,11 +53,8 @@ public class RouterHttpRequestStats extends AbstractVeniceHttpStats {
   private final Sensor latencySensor;
   private final DoubleHistogram latencySensorOtel;
   private final Sensor healthyRequestLatencySensor;
-  private final DoubleHistogram healthyRequestLatencySensorOtel;
   private final Sensor unhealthyRequestLatencySensor;
-  private final DoubleHistogram unhealthyRequestLatencySensorOtel;
   private final Sensor tardyRequestLatencySensor;
-  private final DoubleHistogram tardyRequestLatencySensorOtel;
   private final Sensor throttledRequestLatencySensor;
   private final Sensor requestSizeSensor;
   private final Sensor compressedResponseSizeSensor;
@@ -103,26 +99,22 @@ public class RouterHttpRequestStats extends AbstractVeniceHttpStats {
       ScatterGatherStats scatterGatherStats,
       boolean isKeyValueProfilingEnabled) {
     super(metricsRepository, storeName, requestType);
-    metricDimensions =
-        Attributes.builder().put("storeName", storeName).put("requestType", requestType.toString()).build();
+    metricDimensions = Attributes.builder()
+        .put(VeniceMetricsDimensions.VENICE_STORE_NAME.getDimensionName(), storeName)
+        .put(VeniceMetricsDimensions.VENICE_REQUEST_METHOD.getDimensionName(), requestType.toString())
+        .build();
 
     this.systemStoreName = VeniceSystemStoreUtils.extractSystemStoreType(storeName);
     Rate requestRate = new OccurrenceRate();
     Rate healthyRequestRate = new OccurrenceRate();
     Rate tardyRequestRate = new OccurrenceRate();
     requestSensor = registerSensor("request", new Count(), requestRate);
-    requestSensorOtel =
-        metricsRepository.getOpenTelemetryMetricsRepository().getCounter("CallCount", "NUMBER", "All requests count");
+    requestSensorOtel = metricsRepository.getOpenTelemetryMetricsRepository()
+        .getCounter("CallCount", "NUMBER", "Count of all incoming requests");
     healthySensor = registerSensor("healthy_request", new Count(), healthyRequestRate);
-    healthySensorOtel = metricsRepository.getOpenTelemetryMetricsRepository()
-        .getCounter("SuccessCount", "NUMBER", "All healthy requests count");
     unhealthySensor = registerSensor("unhealthy_request", new Count());
-    unhealthySensorOtel = metricsRepository.getOpenTelemetryMetricsRepository()
-        .getCounter("ErrorCount", "NUMBER", "All unhealthy requests count");
     unavailableReplicaStreamingRequestSensor = registerSensor("unavailable_replica_streaming_request", new Count());
     tardySensor = registerSensor("tardy_request", new Count(), tardyRequestRate);
-    tardySensorOtel = metricsRepository.getOpenTelemetryMetricsRepository()
-        .getCounter("TardyCount", "NUMBER", "All tardy requests count");
     healthyRequestRateSensor =
         registerSensor(new TehutiUtils.SimpleRatioStat(healthyRequestRate, requestRate, "healthy_request_ratio"));
     tardyRequestRatioSensor =
@@ -139,15 +131,9 @@ public class RouterHttpRequestStats extends AbstractVeniceHttpStats {
 
     healthyRequestLatencySensor =
         registerSensorWithDetailedPercentiles("healthy_request_latency", new Avg(), new Max(0));
-    healthyRequestLatencySensorOtel = metricsRepository.getOpenTelemetryMetricsRepository()
-        .getHistogram("SuccessTime", TimeUnit.MILLISECONDS.toString(), "Latency of all healthy requests");
     unhealthyRequestLatencySensor =
         registerSensorWithDetailedPercentiles("unhealthy_request_latency", new Avg(), new Max(0));
-    unhealthyRequestLatencySensorOtel = metricsRepository.getOpenTelemetryMetricsRepository()
-        .getHistogram("ErrorTime", TimeUnit.MILLISECONDS.toString(), "Latency of all unhealthy requests");
     tardyRequestLatencySensor = registerSensorWithDetailedPercentiles("tardy_request_latency", new Avg(), new Max(0));
-    tardyRequestLatencySensorOtel = metricsRepository.getOpenTelemetryMetricsRepository()
-        .getHistogram("TardyTime", TimeUnit.MILLISECONDS.toString(), "Latency of all tardy requests");
     throttledRequestLatencySensor =
         registerSensorWithDetailedPercentiles("throttled_request_latency", new Avg(), new Max(0));
     routerResponseWaitingTimeSensor = registerSensor(
@@ -247,16 +233,13 @@ public class RouterHttpRequestStats extends AbstractVeniceHttpStats {
 
   public void recordHealthyRequest(Double latency) {
     healthySensor.record();
-    healthySensorOtel.add(1, this.metricDimensions);
     if (latency != null) {
       healthyRequestLatencySensor.record(latency);
-      healthyRequestLatencySensorOtel.record(latency);
     }
   }
 
   public void recordUnhealthyRequest() {
     unhealthySensor.record();
-    unhealthySensorOtel.add(1, this.metricDimensions);
   }
 
   public void recordUnavailableReplicaStreamingRequest() {
@@ -266,7 +249,6 @@ public class RouterHttpRequestStats extends AbstractVeniceHttpStats {
   public void recordUnhealthyRequest(double latency) {
     recordUnhealthyRequest();
     unhealthyRequestLatencySensor.record(latency);
-    unhealthyRequestLatencySensorOtel.record(latency);
   }
 
   /**
@@ -279,9 +261,7 @@ public class RouterHttpRequestStats extends AbstractVeniceHttpStats {
 
   public void recordTardyRequest(double latency) {
     tardySensor.record();
-    tardySensorOtel.add(1, this.metricDimensions);
     tardyRequestLatencySensor.record(latency);
-    tardyRequestLatencySensorOtel.record(latency);
   }
 
   public void recordThrottledRequest(double latency) {
@@ -322,9 +302,22 @@ public class RouterHttpRequestStats extends AbstractVeniceHttpStats {
     }
   }
 
-  public void recordLatency(double latency) {
+  public void recordLatency(
+      double latency,
+      HttpResponseStatus responseStatus,
+      VeniceResponseStatus veniceResponseStatus) {
     latencySensor.record(latency);
-    latencySensorOtel.record(latency, metricDimensions);
+    Attributes tempMetricDimensions = Attributes.builder()
+        .putAll(metricDimensions)
+        .put(
+            VeniceMetricsDimensions.HTTP_RESPONSE_STATUS_CODE.getDimensionName(),
+            responseStatus.codeAsText().toString())
+        .put(
+            VeniceMetricsDimensions.HTTP_RESPONSE_STATUS_CODE_CATEGORY.getDimensionName(),
+            responseStatus.codeClass().name())
+        .put(VeniceMetricsDimensions.VENICE_RESPONSE_STATUS_CODE.getDimensionName(), veniceResponseStatus.toString())
+        .build();
+    latencySensorOtel.record(latency, tempMetricDimensions);
   }
 
   public void recordResponseWaitingTime(double waitingTime) {
