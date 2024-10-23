@@ -32,6 +32,7 @@ import com.linkedin.venice.router.stats.AggRouterHttpRequestStats;
 import com.linkedin.venice.router.stats.RouterStats;
 import com.linkedin.venice.router.streaming.SuccessfulStreamingResponse;
 import com.linkedin.venice.schema.avro.ReadAvroProtocolDefinition;
+import com.linkedin.venice.stats.VeniceResponseStatusCategory;
 import com.linkedin.venice.utils.LatencyUtils;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
@@ -230,7 +231,7 @@ public class VeniceResponseAggregator implements ResponseAggregatorFactory<Basic
       }
     }
 
-    HttpResponseStatus responseStatus = finalResponse.status();
+    HttpResponseStatus httpResponseStatus = finalResponse.status();
     Map<MetricNames, TimeValue> allMetrics = metrics.getMetrics();
     /**
      * All the metrics in {@link com.linkedin.ddsstorage.router.api.MetricNames} are supported in {@link Metrics}.
@@ -243,22 +244,27 @@ public class VeniceResponseAggregator implements ResponseAggregatorFactory<Basic
       // TODO: When a batch get throws a quota exception, the ROUTER_SERVER_TIME is missing, so we can't record anything
       // here...
       double latency = LatencyUtils.convertNSToMS(timeValue.getRawValue(TimeUnit.NANOSECONDS));
-      stats.recordLatency(storeName, latency);
-      if (HEALTHY_STATUSES.contains(responseStatus)) {
+      VeniceResponseStatusCategory veniceResponseStatusCategory;
+      if (HEALTHY_STATUSES.contains(httpResponseStatus)) {
         routerStats.getStatsByType(RequestType.SINGLE_GET)
             .recordReadQuotaUsage(storeName, venicePath.getPartitionKeys().size());
         if (isFastRequest(latency, requestType)) {
           stats.recordHealthyRequest(storeName, latency);
+          veniceResponseStatusCategory = VeniceResponseStatusCategory.HEALTHY;
         } else {
           stats.recordTardyRequest(storeName, latency);
+          veniceResponseStatusCategory = VeniceResponseStatusCategory.TARDY;
         }
-      } else if (responseStatus.equals(TOO_MANY_REQUESTS)) {
+      } else if (httpResponseStatus.equals(TOO_MANY_REQUESTS)) {
         LOGGER.debug("request is rejected by storage node because quota is exceeded");
         stats.recordThrottledRequest(storeName, latency);
+        veniceResponseStatusCategory = VeniceResponseStatusCategory.THROTTLED;
       } else {
-        LOGGER.debug("Unhealthy request detected, latency: {}ms, response status: {}", latency, responseStatus);
+        LOGGER.debug("Unhealthy request detected, latency: {}ms, response status: {}", latency, httpResponseStatus);
         stats.recordUnhealthyRequest(storeName, latency);
+        veniceResponseStatusCategory = VeniceResponseStatusCategory.UNHEALTHY;
       }
+      stats.recordLatency(storeName, latency, httpResponseStatus, veniceResponseStatusCategory);
     }
     timeValue = allMetrics.get(ROUTER_RESPONSE_WAIT_TIME);
     if (timeValue != null) {
@@ -275,7 +281,7 @@ public class VeniceResponseAggregator implements ResponseAggregatorFactory<Basic
       double routingTime = LatencyUtils.convertNSToMS(timeValue.getRawValue(TimeUnit.NANOSECONDS));
       stats.recordRequestRoutingLatency(storeName, routingTime);
     }
-    if (HEALTHY_STATUSES.contains(responseStatus) && !venicePath.isStreamingRequest()) {
+    if (HEALTHY_STATUSES.contains(httpResponseStatus) && !venicePath.isStreamingRequest()) {
       // Only record successful response
       stats.recordResponseSize(storeName, finalResponse.content().readableBytes());
     }

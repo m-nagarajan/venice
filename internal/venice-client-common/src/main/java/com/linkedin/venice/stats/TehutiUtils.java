@@ -129,6 +129,15 @@ public class TehutiUtils {
     return metricsRepository;
   }
 
+  public static VeniceMetricsRepository getVeniceMetricsRepository(String serviceName, String metricPrefix) {
+    VeniceMetricsRepository metricsRepository = new VeniceMetricsRepository(
+        new VeniceMetricsConfig.VeniceMetricsConfigBuilder().setServiceName(serviceName)
+            .setMetricPrefix(metricPrefix)
+            .build());
+    metricsRepository.addReporter(new JmxReporter(serviceName));
+    return metricsRepository;
+  }
+
   /**
    * A valid metric name needs to pass the test in {@link javax.management.ObjectName}. This helper function will
    * try to fix all invalid character mentioned in the above function to avoid MalformedObjectNameException; besides,

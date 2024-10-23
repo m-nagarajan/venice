@@ -5,8 +5,10 @@ import com.linkedin.venice.meta.ReadOnlyStoreRepository;
 import com.linkedin.venice.read.RequestType;
 import com.linkedin.venice.stats.AbstractVeniceAggStats;
 import com.linkedin.venice.stats.AbstractVeniceAggStoreStats;
+import com.linkedin.venice.stats.VeniceMetricsRepository;
+import com.linkedin.venice.stats.VeniceResponseStatusCategory;
 import com.linkedin.venice.utils.concurrent.VeniceConcurrentHashMap;
-import io.tehuti.metrics.MetricsRepository;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -15,15 +17,23 @@ public class AggRouterHttpRequestStats extends AbstractVeniceAggStoreStats<Route
   private final Map<String, ScatterGatherStats> scatterGatherStatsMap = new VeniceConcurrentHashMap<>();
 
   public AggRouterHttpRequestStats(
-      MetricsRepository metricsRepository,
+      VeniceMetricsRepository metricsRepository,
+      String clusterName,
       RequestType requestType,
       ReadOnlyStoreRepository metadataRepository,
       boolean isUnregisterMetricForDeletedStoreEnabled) {
-    this(metricsRepository, requestType, false, metadataRepository, isUnregisterMetricForDeletedStoreEnabled);
+    this(
+        metricsRepository,
+        clusterName,
+        requestType,
+        false,
+        metadataRepository,
+        isUnregisterMetricForDeletedStoreEnabled);
   }
 
   public AggRouterHttpRequestStats(
-      MetricsRepository metricsRepository,
+      VeniceMetricsRepository metricsRepository,
+      String clusterName,
       RequestType requestType,
       boolean isKeyValueProfilingEnabled,
       ReadOnlyStoreRepository metadataRepository,
@@ -41,7 +51,13 @@ public class AggRouterHttpRequestStats extends AbstractVeniceAggStoreStats<Route
         stats = scatterGatherStatsMap.computeIfAbsent(storeName, k -> new ScatterGatherStats());
       }
 
-      return new RouterHttpRequestStats(metricsRepo, storeName, requestType, stats, isKeyValueProfilingEnabled);
+      return new RouterHttpRequestStats(
+          metricsRepo,
+          storeName,
+          clusterName,
+          requestType,
+          stats,
+          isKeyValueProfilingEnabled);
     });
   }
 
@@ -144,9 +160,13 @@ public class AggRouterHttpRequestStats extends AbstractVeniceAggStoreStats<Route
     getStoreStats(storeName).recordFanoutRequestCount(count);
   }
 
-  public void recordLatency(String storeName, double latency) {
-    totalStats.recordLatency(latency);
-    getStoreStats(storeName).recordLatency(latency);
+  public void recordLatency(
+      String storeName,
+      double latency,
+      HttpResponseStatus responseStatus,
+      VeniceResponseStatusCategory veniceResponseStatusCategory) {
+    totalStats.recordLatency(latency, responseStatus, veniceResponseStatusCategory);
+    getStoreStats(storeName).recordLatency(latency, responseStatus, veniceResponseStatusCategory);
   }
 
   public void recordResponseWaitingTime(String storeName, double waitingTime) {

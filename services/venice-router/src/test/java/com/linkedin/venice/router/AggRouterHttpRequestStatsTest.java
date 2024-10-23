@@ -3,8 +3,10 @@ package com.linkedin.venice.router;
 import com.linkedin.venice.meta.ReadOnlyStoreRepository;
 import com.linkedin.venice.read.RequestType;
 import com.linkedin.venice.router.stats.AggRouterHttpRequestStats;
+import com.linkedin.venice.stats.VeniceMetricsRepository;
+import com.linkedin.venice.stats.VeniceResponseStatusCategory;
 import com.linkedin.venice.tehuti.MockTehutiReporter;
-import io.tehuti.metrics.MetricsRepository;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;
@@ -12,13 +14,13 @@ import org.testng.annotations.Test;
 
 
 public class AggRouterHttpRequestStatsTest {
-  MetricsRepository metricsRepository;
+  VeniceMetricsRepository metricsRepository;
   private MockTehutiReporter reporter;
   private ReadOnlyStoreRepository storeMetadataRepository;
 
   @BeforeSuite
   public void setUp() {
-    this.metricsRepository = new MetricsRepository();
+    this.metricsRepository = new VeniceMetricsRepository();
     reporter = new MockTehutiReporter();
     metricsRepository.addReporter(reporter);
     storeMetadataRepository = Mockito.mock(ReadOnlyStoreRepository.class);
@@ -26,8 +28,12 @@ public class AggRouterHttpRequestStatsTest {
 
   @Test
   public void testAggRouterMetrics() {
-    AggRouterHttpRequestStats stats =
-        new AggRouterHttpRequestStats(metricsRepository, RequestType.SINGLE_GET, storeMetadataRepository, true);
+    AggRouterHttpRequestStats stats = new AggRouterHttpRequestStats(
+        metricsRepository,
+        "test-cluster",
+        RequestType.SINGLE_GET,
+        storeMetadataRepository,
+        true);
 
     stats.recordRequest("store5");
     Assert.assertEquals(reporter.query(".total--request.Count").value(), 1d);
@@ -45,7 +51,7 @@ public class AggRouterHttpRequestStatsTest {
     Assert.assertEquals(reporter.query(".store1--error_retry.Count").value(), 1d);
 
     for (int i = 1; i <= 100; i += 1) {
-      stats.recordLatency("store2", i);
+      stats.recordLatency("store2", i, HttpResponseStatus.OK, VeniceResponseStatusCategory.HEALTHY);
     }
 
     Assert.assertEquals((int) reporter.query(".total--latency.50thPercentile").value(), 50);
@@ -59,8 +65,13 @@ public class AggRouterHttpRequestStatsTest {
 
   @Test
   public void testProfilingMetrics() {
-    AggRouterHttpRequestStats stats =
-        new AggRouterHttpRequestStats(metricsRepository, RequestType.COMPUTE, true, storeMetadataRepository, true);
+    AggRouterHttpRequestStats stats = new AggRouterHttpRequestStats(
+        metricsRepository,
+        "test-cluster",
+        RequestType.COMPUTE,
+        true,
+        storeMetadataRepository,
+        true);
 
     for (int i = 1; i <= 100; i += 1) {
       stats.recordKeySize("store1", i);
