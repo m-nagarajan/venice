@@ -1,7 +1,7 @@
 package com.linkedin.venice.stats;
 
 public enum VeniceResponseStatusCategory {
-  HEALTHY("healthy"), UNHEALTHY("unhealthy"), TARDY("tardy"), THROTTLED("throttled");
+  HEALTHY("healthy"), UNHEALTHY("unhealthy"), TARDY("tardy"), THROTTLED("throttled"), BAD_REQUEST("bad_request");
 
   private final String category;
 

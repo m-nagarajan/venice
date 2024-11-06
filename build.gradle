@@ -140,7 +140,6 @@ ext.libraries = [
     opentelemetryApi: "io.opentelemetry:opentelemetry-api:1.43.0",
     opentelemetrySdk: "io.opentelemetry:opentelemetry-sdk:1.43.0",
     opentelemetryExporterLogging: "io.opentelemetry:opentelemetry-exporter-logging:1.43.0",
-    //opentelemetryExporterPrometheus: "io.opentelemetry:opentelemetry-exporter-prometheus:1.39.0-alpha"
     opentelemetryExporterOtlp: "io.opentelemetry:opentelemetry-exporter-otlp:1.43.0"
 ]
 

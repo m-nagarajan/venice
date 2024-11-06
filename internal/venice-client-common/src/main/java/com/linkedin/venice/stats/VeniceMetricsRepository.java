@@ -15,29 +15,35 @@ import java.util.Objects;
 /** extends MetricsRepository to keep the changes to a minimum. Next step would be to create a MetricsRepository inside rather than extending it */
 public class VeniceMetricsRepository extends MetricsRepository implements Closeable {
   private MetricsRepository delegate = null;
-
+  private VeniceMetricsConfig veniceMetricsConfig;
   VeniceOpenTelemetryMetricsRepository openTelemetryMetricsRepository;
 
   public VeniceMetricsRepository() {
     super();
-    openTelemetryMetricsRepository =
-        new VeniceOpenTelemetryMetricsRepository(new VeniceMetricsConfig.VeniceMetricsConfigBuilder().build());
+    veniceMetricsConfig = new VeniceMetricsConfig.VeniceMetricsConfigBuilder().build();
+    openTelemetryMetricsRepository = new VeniceOpenTelemetryMetricsRepository(veniceMetricsConfig);
   }
 
-  public VeniceMetricsRepository(VeniceMetricsConfig metricsConfig) {
-    super(metricsConfig.getTehutiMetricConfig());
-    openTelemetryMetricsRepository = new VeniceOpenTelemetryMetricsRepository(metricsConfig);
+  public VeniceMetricsRepository(VeniceMetricsConfig veniceMetricsConfig) {
+    super(veniceMetricsConfig.getTehutiMetricConfig());
+    this.veniceMetricsConfig = veniceMetricsConfig;
+    openTelemetryMetricsRepository = new VeniceOpenTelemetryMetricsRepository(veniceMetricsConfig);
   }
 
   // to pass in the MetricsRepository from venice-backend
-  public VeniceMetricsRepository(MetricsRepository metricsRepository, VeniceMetricsConfig metricsConfig) {
-    // super(metricsConfig.getTehutiMetricConfig());
+  public VeniceMetricsRepository(MetricsRepository metricsRepository, VeniceMetricsConfig veniceMetricsConfig) {
+    // super(veniceMetricsConfig.getTehutiMetricConfig());
     this.delegate = Objects.requireNonNull(metricsRepository);
-    openTelemetryMetricsRepository = new VeniceOpenTelemetryMetricsRepository(metricsConfig);
+    this.veniceMetricsConfig = veniceMetricsConfig;
+    openTelemetryMetricsRepository = new VeniceOpenTelemetryMetricsRepository(veniceMetricsConfig);
   }
 
   public VeniceOpenTelemetryMetricsRepository getOpenTelemetryMetricsRepository() {
     return openTelemetryMetricsRepository;
+  }
+
+  public VeniceMetricsConfig getVeniceMetricsConfig() {
+    return veniceMetricsConfig;
   }
 
   @Override

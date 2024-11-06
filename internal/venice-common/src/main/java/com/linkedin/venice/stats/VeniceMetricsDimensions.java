@@ -13,7 +13,13 @@ public enum VeniceMetricsDimensions {
   HTTP_RESPONSE_STATUS_CODE_CATEGORY("http.response.status_code_category"),
 
   /** {@link VeniceResponseStatusCategory} */
-  VENICE_RESPONSE_STATUS_CODE_CATEGORY("venice.response.status_code_category");
+  VENICE_RESPONSE_STATUS_CODE_CATEGORY("venice.response.status_code_category"),
+
+  /** {@link VeniceRequestRetryType} */
+  VENICE_REQUEST_RETRY_TYPE("venice.request.retry_type"),
+
+  /** {@link VeniceRequestRetryAbortReason} */
+  VENICE_REQUEST_RETRY_ABORT_REASON("venice.request.retry_abort_reason");
 
   private final String dimensionName;
 

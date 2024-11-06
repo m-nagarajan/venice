@@ -3,6 +3,7 @@ package com.linkedin.venice.stats;
 import com.linkedin.venice.exceptions.VeniceException;
 import com.linkedin.venice.utils.concurrent.VeniceConcurrentHashMap;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.DoubleHistogram;
 import io.opentelemetry.api.metrics.DoubleHistogramBuilder;
 import io.opentelemetry.api.metrics.LongCounter;
@@ -36,6 +37,7 @@ public class VeniceOpenTelemetryMetricsRepository {
   private static final String HTTP_EXPORTER_ENDPOINT = "http://[::1]:22784/v1/metrics";
   private OpenTelemetry openTelemetry = null;
   private SdkMeterProvider sdkMeterProvider = null;
+  boolean emitOpenTelemetryMetrics = false;
   Meter meter;
 
   String metricPrefix;
@@ -98,9 +100,6 @@ public class VeniceOpenTelemetryMetricsRepository {
       if (metricsConfig.isEmitToHttpEndpoint()) {
         OtlpHttpMetricExporter httpExporter = getOtlpHttpMetricExporter(metricsConfig);
         builder.registerMetricReader(PeriodicMetricReader.builder(httpExporter).build());
-      }
-      if (metricsConfig.isEmitToPrometheus()) {
-        // builder.registerMetricReader(PrometheusHttpServer.builder().setPort(metricsConfig.getPrometheusPort()).build());
       }
       if (metricsConfig.isEmitToLog()) {
         // internal to test: Disabled by default
@@ -222,44 +221,62 @@ public class VeniceOpenTelemetryMetricsRepository {
   }
 
   public DoubleHistogram getHistogram(String name, String unit, String description) {
-    String fullMetricName = getFullMetricName(name);
-    if (openTelemetry != null) {
-      return histogramMap.computeIfAbsent(name, key -> {
-        DoubleHistogramBuilder builder =
-            meter.histogramBuilder(fullMetricName).setUnit(unit).setDescription(description);
-        return builder.build();
-      });
+    if (emitOpenTelemetryMetrics) {
+      String fullMetricName = getFullMetricName(name);
+      if (openTelemetry != null) {
+        return histogramMap.computeIfAbsent(name, key -> {
+          DoubleHistogramBuilder builder =
+              meter.histogramBuilder(fullMetricName).setUnit(unit).setDescription(description);
+          return builder.build();
+        });
+      } else {
+        LOGGER.error("Metric instrument creation failed for metric {} because OpenTelemetry is not initialized", name);
+        return null;
+      }
     } else {
-      LOGGER.error("Metric instrument creation failed for metric {} because OpenTelemetry is not initialized", name);
       return null;
     }
   }
 
+  public void recordHistogram(DoubleHistogram histogram, double value, Attributes dimensions) {
+    if (emitOpenTelemetryMetrics && histogram != null) {
+      histogram.record(value, dimensions);
+    }
+  }
+
   public DoubleHistogram getHistogramWithoutBuckets(String name, String unit, String description) {
-    String fullMetricName = getFullMetricName(name);
-    if (openTelemetry != null) {
-      return histogramMap.computeIfAbsent(name, key -> {
-        DoubleHistogramBuilder builder = meter.histogramBuilder(fullMetricName)
-            .setExplicitBucketBoundariesAdvice(new ArrayList<>())
-            .setUnit(unit)
-            .setDescription(description);
-        return builder.build();
-      });
+    if (emitOpenTelemetryMetrics) {
+      String fullMetricName = getFullMetricName(name);
+      if (openTelemetry != null) {
+        return histogramMap.computeIfAbsent(name, key -> {
+          DoubleHistogramBuilder builder = meter.histogramBuilder(fullMetricName)
+              .setExplicitBucketBoundariesAdvice(new ArrayList<>())
+              .setUnit(unit)
+              .setDescription(description);
+          return builder.build();
+        });
+      } else {
+        LOGGER.error("Metric instrument creation failed for metric {} because OpenTelemetry is not initialized", name);
+        return null;
+      }
     } else {
-      LOGGER.error("Metric instrument creation failed for metric {} because OpenTelemetry is not initialized", name);
       return null;
     }
   }
 
   public LongCounter getCounter(String name, String unit, String description) {
-    String fullMetricName = getFullMetricName(name);
-    if (openTelemetry != null) {
-      return counterMap.computeIfAbsent(name, key -> {
-        LongCounterBuilder builder = meter.counterBuilder(fullMetricName).setUnit(unit).setDescription(description);
-        return builder.build();
-      });
+    if (emitOpenTelemetryMetrics) {
+      String fullMetricName = getFullMetricName(name);
+      if (openTelemetry != null) {
+        return counterMap.computeIfAbsent(name, key -> {
+          LongCounterBuilder builder = meter.counterBuilder(fullMetricName).setUnit(unit).setDescription(description);
+          return builder.build();
+        });
+      } else {
+        LOGGER.error("Metric instrument creation failed for metric {} because OpenTelemetry is not initialized", name);
+        return null;
+      }
     } else {
-      LOGGER.error("Metric instrument creation failed for metric {} because OpenTelemetry is not initialized", name);
       return null;
     }
   }
