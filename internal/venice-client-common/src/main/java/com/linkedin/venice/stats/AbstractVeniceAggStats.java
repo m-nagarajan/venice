@@ -41,15 +41,17 @@ public abstract class AbstractVeniceAggStats<T extends AbstractVeniceStats> {
       MetricsRepository metricsRepository,
       StatsSupplier<T> statsSupplier,
       boolean perClusterAggregate) {
-    this(
-        clusterName,
+    if (perClusterAggregate && clusterName == null) {
+      throw new IllegalArgumentException("perClusterAggregate cannot be true when clusterName is null");
+    }
+    this.clusterName = clusterName;
+    this.metricsRepository = metricsRepository;
+    this.statsFactory = statsSupplier;
+    this.totalStats = statsSupplier.get(
         metricsRepository,
-        statsSupplier,
-        statsSupplier.get(
-            metricsRepository,
-            perClusterAggregate ? STORE_NAME_FOR_TOTAL_STAT + "." + clusterName : STORE_NAME_FOR_TOTAL_STAT,
-            clusterName,
-            null));
+        perClusterAggregate ? STORE_NAME_FOR_TOTAL_STAT + "." + clusterName : STORE_NAME_FOR_TOTAL_STAT,
+        clusterName,
+        null);
   }
 
   public T getStoreStats(String storeName) {
