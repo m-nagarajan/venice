@@ -11,39 +11,50 @@ public abstract class AbstractVeniceAggStats<T extends AbstractVeniceStats> {
   protected final Map<String, T> storeStats = new VeniceConcurrentHashMap<>();
 
   private StatsSupplier<T> statsFactory;
-  private final MetricsRepository metricsRepository;
 
-  private AbstractVeniceAggStats(MetricsRepository metricsRepository, StatsSupplier<T> statsSupplier, T totalStats) {
+  private final MetricsRepository metricsRepository;
+  private final String clusterName;
+
+  private AbstractVeniceAggStats(
+      String clusterName,
+      MetricsRepository metricsRepository,
+      StatsSupplier<T> statsSupplier,
+      T totalStats) {
+    this.clusterName = clusterName;
     this.metricsRepository = metricsRepository;
     this.statsFactory = statsSupplier;
     this.totalStats = totalStats;
   }
 
-  public AbstractVeniceAggStats(MetricsRepository metricsRepository, StatsSupplier<T> statsSupplier) {
-    this(metricsRepository, statsSupplier, statsSupplier.get(metricsRepository, STORE_NAME_FOR_TOTAL_STAT, null));
-  }
-
-  public AbstractVeniceAggStats(MetricsRepository metricsRepository) {
+  public AbstractVeniceAggStats(String clusterName, MetricsRepository metricsRepository) {
     this.metricsRepository = metricsRepository;
+    this.clusterName = clusterName;
   }
 
   public void setStatsSupplier(StatsSupplier<T> statsSupplier) {
     this.statsFactory = statsSupplier;
-    this.totalStats = statsSupplier.get(metricsRepository, STORE_NAME_FOR_TOTAL_STAT, null);
+    this.totalStats = statsSupplier.get(metricsRepository, STORE_NAME_FOR_TOTAL_STAT, clusterName, null);
   }
 
   public AbstractVeniceAggStats(
       String clusterName,
       MetricsRepository metricsRepository,
-      StatsSupplier<T> statsSupplier) {
+      StatsSupplier<T> statsSupplier,
+      boolean perClusterAggregate) {
     this(
+        clusterName,
         metricsRepository,
         statsSupplier,
-        statsSupplier.get(metricsRepository, STORE_NAME_FOR_TOTAL_STAT + "." + clusterName, null));
+        statsSupplier.get(
+            metricsRepository,
+            perClusterAggregate ? STORE_NAME_FOR_TOTAL_STAT + "." + clusterName : STORE_NAME_FOR_TOTAL_STAT,
+            clusterName,
+            null));
   }
 
   public T getStoreStats(String storeName) {
-    return storeStats.computeIfAbsent(storeName, k -> statsFactory.get(metricsRepository, storeName, totalStats));
+    return storeStats
+        .computeIfAbsent(storeName, k -> statsFactory.get(metricsRepository, storeName, clusterName, totalStats));
   }
 
   public T getNullableStoreStats(String storeName) {
