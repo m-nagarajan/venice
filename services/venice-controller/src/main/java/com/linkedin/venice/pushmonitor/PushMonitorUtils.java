@@ -1,12 +1,13 @@
 package com.linkedin.venice.pushmonitor;
 
+import static com.linkedin.venice.pushmonitor.OfflinePushStatus.*;
+
 import com.linkedin.venice.exceptions.VeniceException;
 import com.linkedin.venice.meta.Version;
 import com.linkedin.venice.pushstatushelper.PushStatusStoreReader;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -380,20 +381,7 @@ public class PushMonitorUtils {
     }
     int incompleteSize = incompletePartition.size();
     if (incompleteSize > 0) {
-      statusDetailStringBuilder.append(". Following partitions still not complete: ");
-
-      // Print at most 5 incomplete partitions to not flood the logs with too many partitions.
-      int partitionsToPrint = Math.min(incompleteSize, 5);
-      Iterator<Integer> iterator = incompletePartition.iterator();
-      for (int i = 0; i < partitionsToPrint; i++) {
-        statusDetailStringBuilder.append(iterator.next());
-        if (i < partitionsToPrint - 1) {
-          statusDetailStringBuilder.append(", ");
-        }
-      }
-      if (incompleteSize > 5) {
-        statusDetailStringBuilder.append(" ... (").append(incompleteSize - 5).append(" more)");
-      }
+      appendIncompletePartitions(statusDetailStringBuilder, incompletePartition);
       statusDetailStringBuilder.append(".  Live replica count: ")
           .append(liveReplicaCount)
           .append(", completed replica count: ")

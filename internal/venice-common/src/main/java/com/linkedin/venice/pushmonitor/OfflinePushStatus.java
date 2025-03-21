@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -157,6 +158,26 @@ public class OfflinePushStatus {
     setPartitionStatus(partitionStatus, true);
   }
 
+  static void appendIncompletePartitions(StringBuilder stringBuilder, Set<Integer> incompletePartitions) {
+    int incompleteSize = incompletePartitions.size();
+    if (incompleteSize > 0) {
+      stringBuilder.append(". Following partitions still not complete: ");
+
+      // Print at most 5 incomplete partitions to not flood the logs with too many partitions.
+      int partitionsToPrint = Math.min(incompleteSize, 5);
+      Iterator<Integer> iterator = incompletePartitions.iterator();
+      for (int i = 0; i < partitionsToPrint; i++) {
+        stringBuilder.append(iterator.next());
+        if (i < partitionsToPrint - 1) {
+          stringBuilder.append(", ");
+        }
+      }
+      if (incompleteSize > 5) {
+        stringBuilder.append(" ... (").append(incompleteSize - 5).append(" more)");
+      }
+    }
+  }
+
   public void setPartitionStatus(PartitionStatus partitionStatus, boolean updateDetails) {
     if (partitionStatus.getPartitionId() < 0 || partitionStatus.getPartitionId() >= numberOfPartition) {
       throw new IllegalArgumentException(
@@ -191,11 +212,12 @@ public class OfflinePushStatus {
       }
     }
     if (finishedPartitions > 0) {
-      String message = finishedPartitions + "/" + numberOfPartition + " partitions completed.";
-      if (incompletePartitions.size() > 0 && incompletePartitions.size() <= 5) {
-        message += ". Following partitions still not complete " + incompletePartitions;
+      StringBuilder statusDetailsBuilder =
+          new StringBuilder(finishedPartitions).append("/").append(numberOfPartition).append(" partitions completed.");
+      if (!incompletePartitions.isEmpty()) {
+        appendIncompletePartitions(statusDetailsBuilder, incompletePartitions);
       }
-      setStatusDetails(message);
+      setStatusDetails(statusDetailsBuilder.toString());
     }
   }
 
