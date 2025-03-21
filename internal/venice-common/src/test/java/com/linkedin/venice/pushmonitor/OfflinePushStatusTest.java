@@ -22,6 +22,7 @@ import static com.linkedin.venice.pushmonitor.ExecutionStatus.START_OF_INCREMENT
 import static com.linkedin.venice.pushmonitor.ExecutionStatus.TOPIC_SWITCH_RECEIVED;
 import static com.linkedin.venice.pushmonitor.ExecutionStatus.UNKNOWN;
 import static com.linkedin.venice.pushmonitor.ExecutionStatus.WARNING;
+import static com.linkedin.venice.pushmonitor.OfflinePushStatus.appendIncompletePartitions;
 import static com.linkedin.venice.utils.Utils.FATAL_DATA_VALIDATION_ERROR;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -312,6 +313,75 @@ public class OfflinePushStatusTest {
       // Assert that hasFatalDataValidationError returns false
       Assert.assertFalse(offlinePushStatus.hasFatalDataValidationError());
     }
+  }
+
+  @Test
+  public void testAppendIncompletePartitions() {
+    // Empty set
+    StringBuilder sb = new StringBuilder();
+    Set<Integer> incompletePartitions = new HashSet<>();
+    appendIncompletePartitions(sb, incompletePartitions);
+    assertEquals("", sb.toString());
+
+    // 1 partition
+    sb = new StringBuilder();
+    incompletePartitions.clear();
+    incompletePartitions.add(5);
+    appendIncompletePartitions(sb, incompletePartitions);
+    assertEquals(". Following partitions still not complete: 5", sb.toString());
+
+    // < 5 partition
+    sb = new StringBuilder();
+    incompletePartitions.clear();
+    incompletePartitions.add(1);
+    incompletePartitions.add(3);
+    incompletePartitions.add(5);
+    appendIncompletePartitions(sb, incompletePartitions);
+    assertEquals(". Following partitions still not complete: 1, 3, 5", sb.toString());
+
+    // = 5 partition
+    sb = new StringBuilder();
+    incompletePartitions.clear();
+    incompletePartitions.add(1);
+    incompletePartitions.add(2);
+    incompletePartitions.add(3);
+    incompletePartitions.add(4);
+    incompletePartitions.add(5);
+    appendIncompletePartitions(sb, incompletePartitions);
+    assertEquals(". Following partitions still not complete: 1, 2, 3, 4, 5", sb.toString());
+
+    // > 5 partition
+    sb = new StringBuilder();
+    incompletePartitions.clear();
+    incompletePartitions.add(1);
+    incompletePartitions.add(2);
+    incompletePartitions.add(3);
+    incompletePartitions.add(4);
+    incompletePartitions.add(5);
+    incompletePartitions.add(6);
+    incompletePartitions.add(7);
+    appendIncompletePartitions(sb, incompletePartitions);
+    assertEquals(". Following partitions still not complete: 1, 2, 3, 4, 5 ... (2 more)", sb.toString());
+
+    // 100 partitions
+    sb = new StringBuilder();
+    incompletePartitions.clear();
+    for (int i = 0; i < 100; i++) {
+      incompletePartitions.add(i);
+    }
+    appendIncompletePartitions(sb, incompletePartitions);
+
+    // Create expected string
+    StringBuilder expected = new StringBuilder(". Following partitions still not complete: ");
+    for (int i = 0; i < 5; i++) {
+      expected.append(i);
+      if (i < 4) {
+        expected.append(", ");
+      }
+    }
+    expected.append(" ... (95 more)");
+
+    assertEquals(expected.toString(), sb.toString());
   }
 
   private void testValidTargetStatus(ExecutionStatus from, ExecutionStatus to) {
