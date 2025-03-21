@@ -379,8 +379,7 @@ public class PushMonitorUtils {
           .append(", total replica count: ")
           .append(totalReplicaCount);
     }
-    int incompleteSize = incompletePartition.size();
-    if (incompleteSize > 0) {
+    if (!incompletePartition.isEmpty()) {
       appendIncompletePartitions(statusDetailStringBuilder, incompletePartition);
       statusDetailStringBuilder.append(".  Live replica count: ")
           .append(liveReplicaCount)
