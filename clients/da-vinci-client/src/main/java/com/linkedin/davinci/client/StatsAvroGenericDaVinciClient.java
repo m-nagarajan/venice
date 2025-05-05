@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
+import org.apache.http.HttpStatus;
 
 
 /**
@@ -24,6 +25,8 @@ import java.util.function.Supplier;
  * 5. Success request/key count ratio.
  */
 public class StatsAvroGenericDaVinciClient<K, V> extends DelegatingAvroGenericDaVinciClient<K, V> {
+  public static final String DAVINCI_CLIENT_SERVICE_NAME = "davinci-client";
+  public static final String DAVINCI_CLIENT_METRIC_PREFIX = "davinci_client";
   private final BasicClientStats clientStatsForSingleGet;
   private final BasicClientStats clientStatsForBatchGet;
 
@@ -47,16 +50,17 @@ public class StatsAvroGenericDaVinciClient<K, V> extends DelegatingAvroGenericDa
     try {
       return futureSupplier.get().whenComplete((v, throwable) -> {
         if (throwable != null) {
-          stats.recordUnhealthyRequest();
+          stats.emitUnhealthyRequestMetrics(LatencyUtils.getElapsedTimeFromNSToMS(startTimeInNS), throwable);
           statFuture.completeExceptionally(throwable);
         } else {
-          stats.recordHealthyRequest();
-          stats.recordHealthyLatency(LatencyUtils.getElapsedTimeFromNSToMS(startTimeInNS));
+          stats.emitHealthyRequestMetrics(LatencyUtils.getElapsedTimeFromNSToMS(startTimeInNS), v);
           statFuture.complete(v);
         }
       });
     } catch (Exception e) {
-      stats.recordUnhealthyRequest();
+      stats.emitUnhealthyRequestMetrics(
+          LatencyUtils.getElapsedTimeFromNSToMS(startTimeInNS),
+          HttpStatus.SC_INTERNAL_SERVER_ERROR);
       throw e;
     }
   }
@@ -85,5 +89,4 @@ public class StatsAvroGenericDaVinciClient<K, V> extends DelegatingAvroGenericDa
       }
     });
   }
-
 }

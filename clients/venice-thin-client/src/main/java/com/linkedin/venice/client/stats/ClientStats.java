@@ -15,7 +15,8 @@ import java.util.Map;
 
 
 public class ClientStats extends BasicClientStats {
-  private final Sensor unhealthyRequestLatencySensor;
+  public static final String THIN_CLIENT_SERVICE_NAME = "venice-thin-client";
+  public static final String THIN_CLIENT_METRIC_PREFIX = "thin_client";
   private final Map<Integer, Sensor> httpStatusSensorMap = new VeniceConcurrentHashMap<>();
   private final Sensor requestRetryCountSensor;
   private final Sensor successRequestDuplicateKeyCountSensor;
@@ -59,7 +60,7 @@ public class ClientStats extends BasicClientStats {
     Rate requestRetryCountRate = new OccurrenceRate();
 
     requestRetryCountSensor = registerSensor("request_retry_count", requestRetryCountRate);
-    unhealthyRequestLatencySensor = registerSensorWithDetailedPercentiles("unhealthy_request_latency", new Avg());
+
     successRequestDuplicateKeyCountSensor = registerSensor("success_request_duplicate_key_count", new Rate());
     /**
      * The time it took to serialize the request, to be sent to the router. This is done in a blocking fashion
@@ -122,10 +123,6 @@ public class ClientStats extends BasicClientStats {
     httpStatusSensorMap
         .computeIfAbsent(httpStatus, status -> registerSensor("http_" + httpStatus + "_request", new OccurrenceRate()))
         .record();
-  }
-
-  public void recordUnhealthyLatency(double latency) {
-    unhealthyRequestLatencySensor.record(latency);
   }
 
   public void recordRequestRetryCount() {

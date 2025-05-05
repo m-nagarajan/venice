@@ -17,6 +17,9 @@ import java.util.stream.IntStream;
 
 
 public class FastClientStats extends com.linkedin.venice.client.stats.ClientStats {
+  public static final String FAST_CLIENT_SERVICE_NAME = "venice-fast-client";
+  public static final String FAST_CLIENT_METRIC_PREFIX = "fast_client";
+
   private final String storeName;
 
   private final Sensor noAvailableReplicaRequestCountSensor;
