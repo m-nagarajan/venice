@@ -11,6 +11,7 @@ import static com.linkedin.venice.stats.dimensions.VeniceMetricsDimensions.VENIC
 import static com.linkedin.venice.utils.Utils.setOf;
 
 import com.linkedin.venice.stats.dimensions.VeniceMetricsDimensions;
+import com.linkedin.venice.stats.metrics.ComponentMetricEntityInterface;
 import com.linkedin.venice.stats.metrics.MetricEntity;
 import com.linkedin.venice.stats.metrics.MetricType;
 import com.linkedin.venice.stats.metrics.MetricUnit;
@@ -20,7 +21,7 @@ import java.util.Set;
 /**
  * List all Metric entities for router
  */
-public enum RouterMetricEntity {
+public enum RouterMetricEntity implements ComponentMetricEntityInterface {
   /**
    * Count of all requests during response handling along with response codes
    */
@@ -106,6 +107,7 @@ public enum RouterMetricEntity {
     this.metricEntity = new MetricEntity(this.name().toLowerCase(), metricType, unit, description, dimensionsList);
   }
 
+  @Override
   public MetricEntity getMetricEntity() {
     return metricEntity;
   }
