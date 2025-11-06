@@ -315,7 +315,7 @@ public class VeniceRouterConfig implements RouterRetryConfig {
       connectionTimeout = props.getInt(ROUTER_CONNECTION_TIMEOUT, 5000); // 5s
 
       statefulRouterHealthCheckEnabled = props.getBoolean(ROUTER_STATEFUL_HEALTHCHECK_ENABLED, true);
-      latencyBasedRoutingEnabled = props.getBoolean(ROUTER_LATENCY_BASED_ROUTING_ENABLED, false);
+      latencyBasedRoutingEnabled = props.getBoolean(ROUTER_LATENCY_BASED_ROUTING_ENABLED, true);
       routerUnhealthyPendingConnThresholdPerRoute =
           props.getInt(ROUTER_UNHEALTHY_PENDING_CONNECTION_THRESHOLD_PER_ROUTE, 100);
       routerPendingConnResumeThresholdPerRoute = props.getInt(ROUTER_PENDING_CONNECTION_RESUME_THRESHOLD_PER_ROUTE, 15);
